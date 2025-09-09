@@ -51,6 +51,12 @@ Please enter your username:`
 
 // ShowDashboard shows the professional dashboard with appointment options
 func (h *ProfessionalHandler) ShowDashboard(chatID int64, user *models.User) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+	user.State = models.StateNone
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 	text := fmt.Sprintf(`👋 Welcome back, %s!
 
 You are registered as a %s.
@@ -127,6 +133,7 @@ Chat ID: %d`, signedInUser.FirstName, signedInUser.LastName, signedInUser.Role, 
 	if err := h.bot.SendMessage(chatID, text); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to send sign-in success")
 	}
+	h.ShowDashboard(chatID, signedInUser)
 }
 
 // HandlePendingAppointments shows pending appointments for professionals
@@ -150,6 +157,7 @@ func (h *ProfessionalHandler) HandlePendingAppointments(chatID int64) {
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
 		}
+		h.ShowDashboard(chatID, user)
 		return
 	}
 
@@ -157,10 +165,11 @@ func (h *ProfessionalHandler) HandlePendingAppointments(chatID int64) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n\n",
+		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n📝 %s\n\n",
 			index+1,
 			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Client.FirstName, apt.Client.LastName)
+			apt.Client.FirstName, apt.Client.LastName,
+			apt.Description)
 
 		// Add confirm and cancel buttons
 		confirmButton := tgbotapi.NewInlineKeyboardButtonData(
@@ -206,6 +215,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
 		}
+		h.ShowDashboard(chatID, user)
 		return
 	}
 
@@ -213,10 +223,11 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n\n",
+		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n📝 %s\n\n",
 			index+1,
 			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Client.FirstName, apt.Client.LastName)
+			apt.Client.FirstName, apt.Client.LastName,
+			apt.Description)
 
 		// Add cancel button for upcoming appointments
 		cancelButton := tgbotapi.NewInlineKeyboardButtonData(

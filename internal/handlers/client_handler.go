@@ -7,6 +7,7 @@ import (
 	"booking_client/internal/models"
 	"booking_client/internal/schema"
 	"booking_client/internal/services"
+	"booking_client/internal/util"
 	"booking_client/pkg/telegram"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -52,6 +53,12 @@ Please enter your first name:`
 
 // ShowDashboard shows the client dashboard with appointment options
 func (h *ClientHandler) ShowDashboard(chatID int64, user *models.User) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+	user.State = models.StateNone
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 	text := fmt.Sprintf(`👋 Welcome back, %s!
 
 You are registered as a %s.
@@ -151,7 +158,14 @@ Welcome, %s %s!
 Role: %s
 Chat ID: %d`, registeredUser.FirstName, registeredUser.LastName, registeredUser.Role, chatID)
 
-	if err := h.bot.SendMessage(chatID, text); err != nil {
+	// Create dashboard keyboard
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Go to Dashboard", "back_to_dashboard"),
+		),
+	)
+
+	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to send registration success")
 	}
 }
@@ -185,6 +199,7 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send no professionals message")
 		}
+		h.ShowDashboard(chatID, user)
 		return
 	}
 
@@ -324,14 +339,16 @@ func (h *ClientHandler) showTimeSelection(chatID int64, availability *models.Pro
 			continue
 		}
 
-		// Parse the RFC3339 time and format it as HH:MM for display
+		// Parse the RFC3339 time and convert to local timezone for display
 		startTime, err := time.Parse(time.RFC3339, slot.StartTime)
 		if err != nil {
 			h.logger.Error().Err(err).Str("time", slot.StartTime).Msg("Failed to parse time slot")
 			continue
 		}
 
-		timeDisplay := startTime.Format("15:04")
+		// Convert to local timezone for display
+		localTime := startTime.In(util.GetAppTimezone())
+		timeDisplay := localTime.Format("15:04")
 		button := tgbotapi.NewInlineKeyboardButtonData(
 			timeDisplay,
 			fmt.Sprintf("select_time_%s", timeDisplay),
@@ -370,8 +387,10 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 	}
 
 	// Parse start time and calculate end time (1 hour later)
+	h.logger.Debug().Str("startTime", startTime).Msg("Parsing start time")
 	start, err := time.Parse("15:04", startTime)
 	if err != nil {
+		h.logger.Error().Err(err).Str("startTime", startTime).Msg("Failed to parse start time")
 		text := "❌ Invalid time format"
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send time error")
@@ -393,14 +412,14 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 		return
 	}
 
-	// Combine date with time and convert to UTC
+	// Combine date with time in application timezone for storage
 	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
-		start.Hour(), start.Minute(), 0, 0, time.UTC)
+		start.Hour(), start.Minute(), 0, 0, util.GetAppTimezone())
 	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
-		end.Hour(), end.Minute(), 0, 0, time.UTC)
+		end.Hour(), end.Minute(), 0, 0, util.GetAppTimezone())
 
 	// Validate that start_time is in the future
-	if startDateTime.Before(time.Now()) {
+	if startDateTime.Before(util.NowInAppTimezone()) {
 		text := "❌ Cannot book appointments in the past. Please select a future time."
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send past time error")
@@ -530,6 +549,7 @@ func (h *ClientHandler) HandlePendingAppointments(chatID int64) {
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
 		}
+		h.ShowDashboard(chatID, user)
 		return
 	}
 
@@ -537,10 +557,13 @@ func (h *ClientHandler) HandlePendingAppointments(chatID int64) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👨‍💼 %s %s\n\n",
+		fmt.Println("apt.StartTime", apt.StartTime)
+		fmt.Println("apt.EndTime", apt.EndTime)
+		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👨‍💼 %s %s\n📝 %s\n\n",
 			index+1,
 			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Professional.FirstName, apt.Professional.LastName)
+			apt.Professional.FirstName, apt.Professional.LastName,
+			apt.Description)
 
 		button := tgbotapi.NewInlineKeyboardButtonData(
 			fmt.Sprintf("❌ Cancel Appointment #%d", index+1),
@@ -581,6 +604,7 @@ func (h *ClientHandler) HandleUpcomingAppointments(chatID int64) {
 		if err := h.bot.SendMessage(chatID, text); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
 		}
+		h.ShowDashboard(chatID, user)
 		return
 	}
 
@@ -588,10 +612,11 @@ func (h *ClientHandler) HandleUpcomingAppointments(chatID int64) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👨‍💼 %s %s\n\n",
+		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👨‍💼 %s %s\n📝 %s\n\n",
 			index+1,
 			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Professional.FirstName, apt.Professional.LastName)
+			apt.Professional.FirstName, apt.Professional.LastName,
+			apt.Description)
 
 		button := tgbotapi.NewInlineKeyboardButtonData(
 			fmt.Sprintf("❌ Cancel Appointment #%d", index+1),
@@ -711,17 +736,20 @@ func (h *ClientHandler) notifyProfessionalNewAppointment(appointment *models.Cre
 👤 Client: %s %s
 📅 Date: %s
 🕐 Time: %s - %s
+📝 Description: %s
 
 Please confirm or cancel this appointment.`,
 		appointment.Client.FirstName, appointment.Client.LastName,
 		appointment.Appointment.StartTime[:10],   // Extract date
 		appointment.Appointment.StartTime[11:16], // Extract time
-		appointment.Appointment.EndTime[11:16])
+		appointment.Appointment.EndTime[11:16],
+		appointment.Appointment.Description)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Confirm", fmt.Sprintf("confirm_appointment_%s", appointment.Appointment.ID)),
 			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", fmt.Sprintf("cancel_appointment_%s", appointment.Appointment.ID)),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Back to Dashboard", "back_to_dashboard"),
 		),
 	)
 

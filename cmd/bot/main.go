@@ -8,6 +8,7 @@ import (
 
 	"booking_client/internal/config"
 	"booking_client/internal/handlers"
+	"booking_client/internal/util"
 	"booking_client/pkg/telegram"
 
 	"github.com/joho/godotenv"
@@ -25,6 +26,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load configuration")
+	}
+
+	// Initialize timezone
+	if err := util.InitTimezone(); err != nil {
+		log.Warn().Err(err).Msg("Failed to load timezone, falling back to local timezone")
+	} else {
+		log.Info().Str("timezone", util.GetAppTimezone().String()).Msg("Timezone initialized")
 	}
 
 	// Initialize logger

@@ -42,6 +42,7 @@ type Appointment struct {
 	StartTime    string `json:"start_time"`
 	EndTime      string `json:"end_time"`
 	Status       string `json:"status"`
+	Description  string `json:"description,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 	Professional *User  `json:"professional,omitempty"`
@@ -86,6 +87,7 @@ type ClientAppointment struct {
 	StartTime    string                         `json:"start_time"`
 	EndTime      string                         `json:"end_time"`
 	Status       string                         `json:"status"`
+	Description  string                         `json:"description,omitempty"`
 	CreatedAt    string                         `json:"created_at"`
 	UpdatedAt    string                         `json:"updated_at"`
 	Professional *ClientAppointmentProfessional `json:"professional,omitempty"`
@@ -124,6 +126,7 @@ type CancelledAppointment struct {
 	StartTime          string `json:"start_time"`
 	EndTime            string `json:"end_time"`
 	Status             string `json:"status"`
+	Description        string `json:"description,omitempty"`
 	CancellationReason string `json:"cancellation_reason"`
 	CancelledBy        string `json:"cancelled_by"`
 	CreatedAt          string `json:"created_at"`
@@ -156,14 +159,15 @@ type GetProfessionalAppointmentsResponse struct {
 
 // ProfessionalAppointment represents an appointment with client details in professional context
 type ProfessionalAppointment struct {
-	ID        string                         `json:"id"`
-	Type      string                         `json:"type"`
-	StartTime string                         `json:"start_time"`
-	EndTime   string                         `json:"end_time"`
-	Status    string                         `json:"status"`
-	CreatedAt string                         `json:"created_at"`
-	UpdatedAt string                         `json:"updated_at"`
-	Client    *ProfessionalAppointmentClient `json:"client,omitempty"`
+	ID          string                         `json:"id"`
+	Type        string                         `json:"type"`
+	StartTime   string                         `json:"start_time"`
+	EndTime     string                         `json:"end_time"`
+	Status      string                         `json:"status"`
+	Description string                         `json:"description,omitempty"`
+	CreatedAt   string                         `json:"created_at"`
+	UpdatedAt   string                         `json:"updated_at"`
+	Client      *ProfessionalAppointmentClient `json:"client,omitempty"`
 }
 
 // ProfessionalAppointmentClient represents client details in appointment context
