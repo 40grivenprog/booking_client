@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"booking_client/internal/models"
+	"booking_client/internal/services"
 	"booking_client/pkg/telegram"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -12,22 +13,25 @@ import (
 
 // NotificationService handles all notification-related operations
 type NotificationService struct {
-	bot    *telegram.Bot
-	logger *zerolog.Logger
+	bot        *telegram.Bot
+	logger     *zerolog.Logger
+	apiService *services.APIService
 }
 
 // NewNotificationService creates a new notification service
-func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger) *NotificationService {
+func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger, apiService *services.APIService) *NotificationService {
 	return &NotificationService{
-		bot:    bot,
-		logger: logger,
+		bot:        bot,
+		logger:     logger,
+		apiService: apiService,
 	}
 }
 
 // NotifyProfessionalNewAppointment sends notification to professional about new appointment
 func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *models.CreateAppointmentResponse) {
-	if appointment.Professional.ChatID == 0 {
-		return // No chat ID for professional
+	currentUser, ok := getUserOrSendError(ns.apiService.GetUserRepository(), ns.bot, ns.logger, appointment.Professional.ChatID)
+	if !ok {
+		return
 	}
 
 	date, startTime, endTime := formatAppointmentTime(appointment.Appointment.StartTime, appointment.Appointment.EndTime)
@@ -44,10 +48,13 @@ func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *mod
 			tgbotapi.NewInlineKeyboardButtonData(BtnBackToDashboard, "back_to_dashboard"),
 		),
 	)
-
-	if err := ns.bot.SendMessageWithKeyboard(appointment.Professional.ChatID, text, keyboard); err != nil {
+	id, err := ns.bot.SendMessageWithKeyboardAndID(appointment.Professional.ChatID, text, keyboard)
+	if err != nil {
 		ns.logger.Error().Err(err).Msg("Failed to send professional notification")
 	}
+	
+	currentUser.LastMessageID = &id
+	ns.apiService.GetUserRepository().SetUser(appointment.Professional.ChatID, currentUser)
 }
 
 // NotifyProfessionalCancellation sends notification to professional about appointment cancellation

@@ -27,7 +27,7 @@ func NewClientHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *ser
 		bot:                 bot,
 		logger:              logger,
 		apiService:          apiService,
-		notificationService: NewNotificationService(bot, logger),
+		notificationService: NewNotificationService(bot, logger, apiService),
 	}
 }
 

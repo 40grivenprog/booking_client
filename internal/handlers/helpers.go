@@ -28,10 +28,34 @@ func (h *ClientHandler) sendMessage(chatID int64, text string) {
 	}
 }
 
+// sendMessageWithID sends a message and returns the message ID
+func (h *ClientHandler) sendMessageWithID(chatID int64, text string) (int, error) {
+	return h.bot.SendMessageWithID(chatID, text)
+}
+
 // sendMessageWithKeyboard sends a message with inline keyboard
 func (h *ClientHandler) sendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
 	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to send message with keyboard")
+	}
+}
+
+// sendMessageWithKeyboardAndID sends a message with keyboard and returns the message ID
+func (h *ClientHandler) sendMessageWithKeyboardAndID(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) (int, error) {
+	return h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
+}
+
+// editMessage edits the last message sent to the user
+func (h *ClientHandler) editMessage(chatID int64, messageID int, text string) {
+	if err := h.bot.EditMessage(chatID, messageID, text); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to edit message")
+	}
+}
+
+// editMessageWithKeyboard edits the last message with keyboard
+func (h *ClientHandler) editMessageWithKeyboard(chatID int64, messageID int, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+	if err := h.bot.EditMessageWithKeyboard(chatID, messageID, text, keyboard); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to edit message with keyboard")
 	}
 }
 
@@ -260,10 +284,34 @@ func (h *ProfessionalHandler) sendMessage(chatID int64, text string) {
 	}
 }
 
+// sendMessageWithID sends a message and returns the message ID (ProfessionalHandler version)
+func (h *ProfessionalHandler) sendMessageWithID(chatID int64, text string) (int, error) {
+	return h.bot.SendMessageWithID(chatID, text)
+}
+
 // sendMessageWithKeyboard sends a message with inline keyboard (ProfessionalHandler version)
 func (h *ProfessionalHandler) sendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
 	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to send message with keyboard")
+	}
+}
+
+// sendMessageWithKeyboardAndID sends a message with keyboard and returns the message ID (ProfessionalHandler version)
+func (h *ProfessionalHandler) sendMessageWithKeyboardAndID(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) (int, error) {
+	return h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
+}
+
+// editMessage edits the last message sent to the user (ProfessionalHandler version)
+func (h *ProfessionalHandler) editMessage(chatID int64, messageID int, text string) {
+	if err := h.bot.EditMessage(chatID, messageID, text); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to edit message")
+	}
+}
+
+// editMessageWithKeyboard edits the last message with keyboard (ProfessionalHandler version)
+func (h *ProfessionalHandler) editMessageWithKeyboard(chatID int64, messageID int, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+	if err := h.bot.EditMessageWithKeyboard(chatID, messageID, text, keyboard); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to edit message with keyboard")
 	}
 }
 

@@ -120,11 +120,54 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 	return err
 }
 
+// SendMessageWithID sends a message and returns the message ID
+func (b *Bot) SendMessageWithID(chatID int64, text string) (int, error) {
+	msg := tgbotapi.NewMessage(chatID, text)
+	sentMsg, err := b.api.Send(msg)
+	if err != nil {
+		return 0, err
+	}
+	return sentMsg.MessageID, nil
+}
+
 // SendMessageWithKeyboard sends a message with a custom keyboard
 func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 	_, err := b.api.Send(msg)
+	return err
+}
+
+// SendMessageWithKeyboardAndID sends a message with keyboard and returns the message ID
+func (b *Bot) SendMessageWithKeyboardAndID(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) (int, error) {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyMarkup = keyboard
+	sentMsg, err := b.api.Send(msg)
+	if err != nil {
+		return 0, err
+	}
+	return sentMsg.MessageID, nil
+}
+
+// EditMessage edits an existing message
+func (b *Bot) EditMessage(chatID int64, messageID int, text string) error {
+	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
+	_, err := b.api.Send(edit)
+	return err
+}
+
+// EditMessageWithKeyboard edits an existing message with a custom keyboard
+func (b *Bot) EditMessageWithKeyboard(chatID int64, messageID int, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
+	edit.ReplyMarkup = &keyboard
+	_, err := b.api.Send(edit)
+	return err
+}
+
+// DeleteMessage deletes a message
+func (b *Bot) DeleteMessage(chatID int64, messageID int) error {
+	delete := tgbotapi.NewDeleteMessage(chatID, messageID)
+	_, err := b.api.Send(delete)
 	return err
 }
 

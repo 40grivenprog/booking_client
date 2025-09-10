@@ -27,7 +27,7 @@ func NewProfessionalHandler(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 		bot:                 bot,
 		logger:              logger,
 		apiService:          apiService,
-		notificationService: NewNotificationService(bot, logger),
+		notificationService: NewNotificationService(bot, logger, apiService),
 	}
 }
 
@@ -59,6 +59,30 @@ func (h *ProfessionalHandler) ShowDashboard(chatID int64, user *models.User) {
 	keyboard := h.createProfessionalDashboardKeyboard()
 
 	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// ShowDashboardWithEdit shows the professional dashboard by editing the last message
+func (h *ProfessionalHandler) ShowDashboardWithEdit(chatID int64, user *models.User) {
+	currentUser, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+	currentUser.State = models.StateNone
+	h.apiService.GetUserRepository().SetUser(chatID, currentUser)
+
+	text := fmt.Sprintf(UIMsgWelcomeBackProfessional, currentUser.LastName, currentUser.Role)
+	keyboard := h.createProfessionalDashboardKeyboard()
+
+	// If user has a last message ID, edit it; otherwise send a new message
+	if currentUser.LastMessageID != nil {
+		h.editMessageWithKeyboard(chatID, *currentUser.LastMessageID, text, keyboard)
+	} else {
+		messageID, err := h.sendMessageWithKeyboardAndID(chatID, text, keyboard)
+		if err == nil {
+			currentUser.LastMessageID = &messageID
+			h.apiService.GetUserRepository().SetUser(chatID, currentUser)
+		}
+	}
 }
 
 // HandleUsernameInput handles username input for professional sign-in
@@ -322,11 +346,23 @@ func (h *ProfessionalHandler) HandleConfirmAppointment(chatID int64, appointment
 		date, startTime, endTime,
 		response.Client.FirstName, response.Client.LastName)
 
-	h.sendMessage(chatID, text)
+	confirmedMessageID, err := h.sendMessageWithID(chatID, text)
+	if err == nil {
+		h.apiService.GetUserRepository().SetUser(chatID, user)
+	}
 
 	// Notify client about confirmation
 	h.notificationService.NotifyClientAppointmentConfirmation(response)
-	h.ShowDashboard(chatID, user)
+
+	// Wait a moment then show dashboard (disappearing message effect)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		h.bot.DeleteMessage(chatID, *user.LastMessageID)
+	}()
+	go func() {
+		time.Sleep(3 * time.Second)
+		h.bot.DeleteMessage(chatID, confirmedMessageID)
+	}()
 }
 
 // HandleCancelAppointment starts the professional appointment cancellation process
