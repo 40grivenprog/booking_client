@@ -104,6 +104,15 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		h.professionalHandler.HandlePendingAppointments(chatID)
 	case data == "professional_upcoming_appointments":
 		h.professionalHandler.HandleUpcomingAppointments(chatID)
+	case len(data) >= 20 && data[:20] == "prev_upcoming_month_":
+		month := data[20:]
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, "prev")
+	case len(data) >= 20 && data[:20] == "next_upcoming_month_":
+		month := data[20:]
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, "next")
+	case len(data) >= 21 && data[:21] == "select_upcoming_date_":
+		date := data[21:]
+		h.professionalHandler.HandleUpcomingAppointmentsDateSelection(chatID, date)
 	case data == "set_unavailable":
 		h.professionalHandler.HandleSetUnavailable(chatID)
 	case data == "cancel_booking":

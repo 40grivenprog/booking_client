@@ -495,3 +495,64 @@ func (h *ProfessionalHandler) createUnavailableEndTimeKeyboard(startTime string,
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
+
+// createUpcomingAppointmentsDateKeyboard creates a keyboard for upcoming appointments date selection
+func (h *ProfessionalHandler) createUpcomingAppointmentsDateKeyboard(dates []string, currentMonth string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	var currentRow []tgbotapi.InlineKeyboardButton
+
+	// Add month navigation buttons at the top
+	// Only show previous button if not current month
+	currentTime := time.Now()
+	currentMonthTime, _ := time.Parse("2006-01", currentMonth)
+	isCurrentMonth := currentMonthTime.Year() == currentTime.Year() && currentMonthTime.Month() == currentTime.Month()
+
+	var navButtons []tgbotapi.InlineKeyboardButton
+	if !isCurrentMonth {
+		prevButton := tgbotapi.NewInlineKeyboardButtonData(BtnPreviousMonth, "prev_upcoming_month_"+currentMonth)
+		navButtons = append(navButtons, prevButton)
+	}
+	nextButton := tgbotapi.NewInlineKeyboardButtonData(BtnNextMonth, "next_upcoming_month_"+currentMonth)
+	navButtons = append(navButtons, nextButton)
+
+	if len(navButtons) > 0 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(navButtons...))
+	}
+
+	for _, dateStr := range dates {
+		// Parse date to format it nicely
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			continue
+		}
+
+		// Format as "Sep 10" or "Today" if it's today
+		var displayText string
+		if date.Year() == time.Now().Year() && date.Month() == time.Now().Month() && date.Day() == time.Now().Day() {
+			displayText = "Today"
+		} else {
+			displayText = date.Format("Jan 02")
+		}
+
+		button := tgbotapi.NewInlineKeyboardButtonData(
+			displayText,
+			fmt.Sprintf("select_upcoming_date_%s", dateStr),
+		)
+		currentRow = append(currentRow, button)
+
+		if len(currentRow) == DaysPerRow {
+			rows = append(rows, currentRow)
+			currentRow = []tgbotapi.InlineKeyboardButton{}
+		}
+	}
+
+	if len(currentRow) > 0 {
+		rows = append(rows, currentRow)
+	}
+
+	// Add back to dashboard button
+	backButton := tgbotapi.NewInlineKeyboardButtonData(BtnBackToDashboard, "back_to_dashboard")
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}

@@ -84,6 +84,7 @@ const (
 	UIMsgUnavailableDescription             = "📝 Please provide a description for your unavailable period:\n\n📅 Date: %s\n🕐 Time: %s - %s\n\nExample: \"Personal break\", \"Lunch time\", \"Out of office\", etc."
 	UIMsgUnavailableSlotWarning             = "⚠️ You can only select times before %s (%s)"
 	UIMsgNoAvailableTimeSlots               = "❌ No available time slots before your next unavailable period."
+	UIMsgSelectUpcomingAppointmentsDate     = "📅 Select a date to view upcoming appointments:"
 	UIMsgAppointmentConfirmed               = "✅ Appointment Confirmed!\n\n📅 Date: %s\n🕐 Time: %s - %s\n👨‍💼 Professional: %s %s\n\nYour appointment has been confirmed."
 	UIMsgAppointmentCancelledByProfessional = "🔔 Appointment Cancelled by Professional\n\n📅 Date: %s\n🕐 Time: %s - %s\n👨‍💼 Professional: %s %s\n📝 Reason: %s"
 )

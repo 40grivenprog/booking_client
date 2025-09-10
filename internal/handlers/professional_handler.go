@@ -138,7 +138,102 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
 		return
 	}
 
-	appointments, err := h.apiService.GetProfessionalAppointments(user.ID, "confirmed")
+	// Show date picker for upcoming appointments
+	h.showUpcomingAppointmentsDatePicker(chatID, user)
+}
+
+// showUpcomingAppointmentsDatePicker shows a date picker for upcoming appointments
+func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, user *models.User, month ...string) {
+	// Get current month or use provided month
+	var currentMonth string
+	if len(month) > 0 {
+		currentMonth = month[0]
+	} else {
+		currentMonth = time.Now().Format("2006-01")
+	}
+
+	// Get dates with appointments for current month
+	datesResponse, err := h.apiService.GetProfessionalAppointmentDates(user.ID, currentMonth)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgFailedToLoadUpcomingAppointments, err)
+		return
+	}
+
+	if len(datesResponse.Dates) == 0 {
+		h.sendMessage(chatID, UIMsgNoUpcomingAppointments)
+		h.ShowDashboard(chatID, user)
+		return
+	}
+
+	text := UIMsgSelectUpcomingAppointmentsDate
+	keyboard := h.createUpcomingAppointmentsDateKeyboard(datesResponse.Dates, currentMonth)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUpcomingAppointmentsMonthNavigation handles month navigation for upcoming appointments
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(chatID int64, monthStr string, direction string) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Parse current month
+	currentMonth, err := time.Parse("2006-01", monthStr)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgInvalidDateFormat, err)
+		return
+	}
+
+	// Calculate new month based on direction
+	var newMonth time.Time
+	if direction == "prev" {
+		newMonth = currentMonth.AddDate(0, -1, 0)
+	} else {
+		newMonth = currentMonth.AddDate(0, 1, 0)
+	}
+
+	newMonthStr := newMonth.Format("2006-01")
+
+	// Get dates with appointments for the new month
+	datesResponse, err := h.apiService.GetProfessionalAppointmentDates(user.ID, newMonthStr)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgFailedToLoadUpcomingAppointments, err)
+		return
+	}
+
+	if len(datesResponse.Dates) == 0 {
+		// If no appointments in this month, go back to previous month
+		var previousMonth time.Time
+		if direction == "prev" {
+			// If we went to previous month and it's empty, go back to current month
+			previousMonth = time.Now()
+		} else {
+			// If we went to next month and it's empty, go back to previous month
+			previousMonth = newMonth.AddDate(0, -1, 0)
+		}
+
+		previousMonthStr := previousMonth.Format("2006-01")
+		h.sendMessage(chatID, UIMsgNoUpcomingAppointments)
+
+		// Show the previous month
+		h.showUpcomingAppointmentsDatePicker(chatID, user, previousMonthStr)
+		return
+	}
+
+	text := UIMsgSelectUpcomingAppointmentsDate
+	keyboard := h.createUpcomingAppointmentsDateKeyboard(datesResponse.Dates, newMonthStr)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUpcomingAppointmentsDateSelection handles selection of a date for upcoming appointments
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(chatID int64, dateStr string) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Get appointments for the selected date
+	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(user.ID, "confirmed", dateStr)
 	if err != nil {
 		h.sendError(chatID, ErrorMsgFailedToLoadUpcomingAppointments, err)
 		return
@@ -150,7 +245,14 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
 		return
 	}
 
-	text := UIMsgUpcomingAppointments
+	// Format the date for display
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		h.sendError(chatID, "Invalid date format", err)
+		return
+	}
+
+	text := fmt.Sprintf("📅 Upcoming Appointments for %s:\n\n", date.Format("Monday, January 2, 2006"))
 	for index, apt := range appointments.Appointments {
 		text += formatProfessionalAppointmentDetails(&apt, index)
 	}

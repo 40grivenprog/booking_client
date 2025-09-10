@@ -408,6 +408,42 @@ func (s *APIService) GetProfessionalAppointments(professionalID, status string) 
 	return &response, nil
 }
 
+// GetProfessionalAppointmentDates retrieves dates with confirmed appointments for a month
+func (s *APIService) GetProfessionalAppointmentDates(professionalID, month string) (*models.GetProfessionalAppointmentDatesResponse, error) {
+	url := fmt.Sprintf("%s/api/professionals/%s/appointment_dates", s.baseURL, professionalID)
+	if month != "" {
+		url += "?month=" + month
+	}
+
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var response models.GetProfessionalAppointmentDatesResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
 // ConfirmProfessionalAppointment confirms an appointment by professional
 func (s *APIService) ConfirmProfessionalAppointment(professionalID, appointmentID string, req *schema.ConfirmAppointmentRequest) (*models.ConfirmProfessionalAppointmentResponse, error) {
 	url := fmt.Sprintf("%s/api/professionals/%s/appointments/%s/confirm", s.baseURL, professionalID, appointmentID)

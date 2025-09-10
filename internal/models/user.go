@@ -168,6 +168,12 @@ type GetProfessionalAppointmentsResponse struct {
 	Appointments []ProfessionalAppointment `json:"appointments"`
 }
 
+// GetProfessionalAppointmentDatesResponse represents the response for getting appointment dates
+type GetProfessionalAppointmentDatesResponse struct {
+	Month string   `json:"month"`
+	Dates []string `json:"dates"`
+}
+
 // ProfessionalAppointment represents an appointment with client details in professional context
 type ProfessionalAppointment struct {
 	ID          string                         `json:"id"`
