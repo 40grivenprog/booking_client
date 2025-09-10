@@ -2,21 +2,23 @@ package models
 
 // User represents a user in the system
 type User struct {
-	ID                     string  `json:"id"`
-	ChatID                 *int64  `json:"chat_id,omitempty"`
-	Username               string  `json:"username"`
-	FirstName              string  `json:"first_name"`
-	LastName               string  `json:"last_name"`
-	Role                   string  `json:"role"` // "client" or "professional"
-	PhoneNumber            *string `json:"phone_number,omitempty"`
-	State                  string  `json:"state,omitempty"`                    // Bot interaction state
-	SelectedProfessionalID string  `json:"selected_professional_id,omitempty"` // Temporary storage for appointment booking
-	SelectedDate           string  `json:"selected_date,omitempty"`            // Temporary storage for selected date
-	SelectedTime           string  `json:"selected_time,omitempty"`            // Temporary storage for selected time
-	SelectedEndTime        string  `json:"selected_end_time,omitempty"`        // Temporary storage for selected end time
-	SelectedAppointmentID  string  `json:"selected_appointment_id,omitempty"`  // Temporary storage for appointment cancellation
-	CreatedAt              string  `json:"created_at"`
-	UpdatedAt              string  `json:"updated_at"`
+	ID                             string  `json:"id"`
+	ChatID                         *int64  `json:"chat_id,omitempty"`
+	Username                       string  `json:"username"`
+	FirstName                      string  `json:"first_name"`
+	LastName                       string  `json:"last_name"`
+	Role                           string  `json:"role"` // "client" or "professional"
+	PhoneNumber                    *string `json:"phone_number,omitempty"`
+	State                          string  `json:"state,omitempty"`                            // Bot interaction state
+	SelectedProfessionalID         string  `json:"selected_professional_id,omitempty"`         // Temporary storage for appointment booking
+	SelectedDate                   string  `json:"selected_date,omitempty"`                    // Temporary storage for selected date
+	SelectedTime                   string  `json:"selected_time,omitempty"`                    // Temporary storage for selected time
+	SelectedUnavailableStartTime   string  `json:"selected_unavailable_start_time,omitempty"`  // Temporary storage for selected unavailable start time
+	SelectedUnavailableEndTime     string  `json:"selected_unavailable_end_time,omitempty"`    // Temporary storage for selected unavailable end time
+	SelectedUnavailableDescription string  `json:"selected_unavailable_description,omitempty"` // Temporary storage for selected unavailable description
+	SelectedAppointmentID          string  `json:"selected_appointment_id,omitempty"`          // Temporary storage for appointment cancellation
+	CreatedAt                      string  `json:"created_at"`
+	UpdatedAt                      string  `json:"updated_at"`
 }
 
 // User states for bot interaction
@@ -154,10 +156,11 @@ type ProfessionalAvailabilityResponse struct {
 
 // TimeSlot represents a one-hour time slot
 type TimeSlot struct {
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time"`
-	Available bool   `json:"available"`
-	Type      string `json:"type,omitempty"` // "appointment", "unavailable", or empty if available
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	Available   bool   `json:"available"`
+	Type        string `json:"type,omitempty"`        // "appointment", "unavailable", or empty if available
+	Description string `json:"description,omitempty"` // Description with client info if available
 }
 
 // GetProfessionalAppointmentsResponse represents the response for getting professional appointments
@@ -203,6 +206,11 @@ type CancelProfessionalAppointmentResponse struct {
 
 // CreateUnavailableAppointmentResponse represents the response after creating an unavailable appointment
 type CreateUnavailableAppointmentResponse struct {
+	Appointment UnavailableAppointment `json:"appointment"`
+}
+
+// UnavailableAppointment represents an unavailable appointment
+type UnavailableAppointment struct {
 	ID          string `json:"id"`
 	Type        string `json:"type"`
 	StartTime   string `json:"start_time"`

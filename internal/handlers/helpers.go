@@ -60,7 +60,6 @@ func (h *ClientHandler) clearBookingState(user *models.User) {
 	user.SelectedProfessionalID = ""
 	user.SelectedDate = ""
 	user.SelectedTime = ""
-	user.SelectedEndTime = ""
 	user.SelectedAppointmentID = ""
 }
 
@@ -291,8 +290,9 @@ func (h *ProfessionalHandler) validateUserState(chatID int64, allowedStates []st
 func (h *ProfessionalHandler) clearUnavailableState(user *models.User) {
 	user.State = models.StateNone
 	user.SelectedDate = ""
-	user.SelectedTime = ""
-	user.SelectedEndTime = ""
+	user.SelectedUnavailableStartTime = ""
+	user.SelectedUnavailableEndTime = ""
+	user.SelectedUnavailableDescription = ""
 	user.SelectedAppointmentID = ""
 }
 
@@ -444,34 +444,44 @@ func (h *ProfessionalHandler) createUnavailableStartTimeKeyboard(availability *m
 }
 
 // createUnavailableEndTimeKeyboard creates a keyboard for unavailable end time selection
-func (h *ProfessionalHandler) createUnavailableEndTimeKeyboard(startTime string, nearestAppointment *models.ProfessionalAppointment) tgbotapi.InlineKeyboardMarkup {
+func (h *ProfessionalHandler) createUnavailableEndTimeKeyboard(startTime string, availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	var currentRow []tgbotapi.InlineKeyboardButton
 
-	// Generate time slots from start time + 1 hour to end of day or nearest appointment
-	start, _ := time.Parse("15:04", startTime)
-	endLimit := time.Date(start.Year(), start.Month(), start.Day(), 23, 0, 0, 0, util.GetAppTimezone())
-
-	if nearestAppointment != nil {
-		nearestStart, _ := time.Parse(time.RFC3339, nearestAppointment.StartTime)
-		nearestStartLocal := nearestStart.In(util.GetAppTimezone())
-		if nearestStartLocal.Before(endLimit) {
-			endLimit = nearestStartLocal
+	// Find available slots after the selected start time
+	for _, slot := range availability.Slots {
+		slotStart, err := time.Parse(time.RFC3339, slot.StartTime)
+		if err != nil {
+			continue
 		}
-	}
+		slotStartLocal := slotStart.In(util.GetAppTimezone())
 
-	// Generate hourly slots from start + 1 hour to end limit (exclusive)
-	for current := start.Add(time.Hour); current.Before(endLimit); current = current.Add(time.Hour) {
-		timeDisplay := current.Format("15:04")
-		button := tgbotapi.NewInlineKeyboardButtonData(
-			timeDisplay,
-			fmt.Sprintf("select_unavailable_end_%s", timeDisplay),
-		)
-		currentRow = append(currentRow, button)
+		// Only show slots that are:
+		// 1. Available (not blocked by existing appointments/unavailable periods)
+		// 2. At least 1 hour after the selected start time
+		// 3. Before the first unavailable slot
+		slotTimeStr := slotStartLocal.Format("15:04")
+		if slot.Available && slotTimeStr >= startTime {
+			// Use the end time of the slot as the end time option
+			slotEnd, err := time.Parse(time.RFC3339, slot.EndTime)
+			if err != nil {
+				continue
+			}
+			slotEndLocal := slotEnd.In(util.GetAppTimezone())
+			timeDisplay := slotEndLocal.Format("15:04")
+			button := tgbotapi.NewInlineKeyboardButtonData(
+				timeDisplay,
+				fmt.Sprintf("select_unavailable_end_%s", timeDisplay),
+			)
+			currentRow = append(currentRow, button)
 
-		if len(currentRow) == TimeSlotsPerRow {
-			rows = append(rows, currentRow)
-			currentRow = []tgbotapi.InlineKeyboardButton{}
+			if len(currentRow) == TimeSlotsPerRow {
+				rows = append(rows, currentRow)
+				currentRow = []tgbotapi.InlineKeyboardButton{}
+			}
+		} else if !slot.Available && slotTimeStr > startTime {
+			// Stop at the first unavailable slot after start time
+			break
 		}
 	}
 

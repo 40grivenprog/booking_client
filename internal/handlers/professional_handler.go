@@ -301,70 +301,62 @@ func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(chatID int64, 
 	}
 
 	user.State = models.StateWaitingForUnavailableEndTime
-	user.SelectedTime = startTime // Store start time temporarily
+	user.SelectedUnavailableStartTime = startTime // Store start time temporarily
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	// Get appointments for this specific date to find the nearest appointment
-	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(user.ID, "confirmed", user.SelectedDate)
+	// Get availability for the selected date to determine available end times
+	availability, err := h.apiService.GetProfessionalAvailability(user.ID, user.SelectedDate)
 	if err != nil {
-		h.sendError(chatID, ErrorMsgFailedToLoadAppointments, err)
+		h.sendError(chatID, ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
-	// Find the nearest appointment after the selected start time
-	var nearestAppointment *models.ProfessionalAppointment
-	selectedStart, _ := time.Parse("15:04", startTime)
-
-	for _, apt := range appointments.Appointments {
-		aptStart, err := time.Parse(time.RFC3339, apt.StartTime)
-		if err != nil {
-			continue
-		}
-		aptStartLocal := aptStart.In(util.GetAppTimezone())
-
-		if aptStartLocal.After(selectedStart) {
-			if nearestAppointment == nil {
-				nearestAppointment = &apt
-			} else {
-				nearestStart, err := time.Parse(time.RFC3339, nearestAppointment.StartTime)
-				if err == nil {
-					nearestStartLocal := nearestStart.In(util.GetAppTimezone())
-					if aptStartLocal.Before(nearestStartLocal) {
-						nearestAppointment = &apt
-					}
-				}
-			}
-		}
-	}
-
-	h.showUnavailableEndTimeSelection(chatID, startTime, nearestAppointment)
+	h.showUnavailableEndTimeSelection(chatID, startTime, availability)
 }
 
 // showUnavailableEndTimeSelection shows available time slots for end time
-func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, nearestAppointment *models.ProfessionalAppointment) {
+func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, availability *models.ProfessionalAvailabilityResponse) {
 	text := fmt.Sprintf(UIMsgSelectUnavailableEndTime, startTime)
 
-	if nearestAppointment != nil {
-		nearestStart, _ := time.Parse(time.RFC3339, nearestAppointment.StartTime)
-		nearestStartLocal := nearestStart.In(util.GetAppTimezone())
+	// Find the first unavailable slot after the selected start time to show warning
+	var firstUnavailableSlot *models.TimeSlot
 
-		// Build appointment details
-		appointmentDetails := fmt.Sprintf("Appointment at %s", nearestStartLocal.Format("15:04"))
-		if nearestAppointment.Description != "" {
-			appointmentDetails += fmt.Sprintf(" - %s", nearestAppointment.Description)
+	for _, slot := range availability.Slots {
+		slotStart, err := time.Parse(time.RFC3339, slot.StartTime)
+		if err != nil {
+			continue
 		}
-		if nearestAppointment.Client != nil {
-			appointmentDetails += fmt.Sprintf(" (Client: %s %s)", nearestAppointment.Client.FirstName, nearestAppointment.Client.LastName)
-		}
+		slotStartLocal := slotStart.In(util.GetAppTimezone())
+		slotTimeStr := slotStartLocal.Format("15:04")
 
-		text += fmt.Sprintf("\n\n⚠️ You can only select times before %s (%s)", nearestStartLocal.Format("15:04"), appointmentDetails)
+		// Only consider slots that are after the selected start time
+		if !slot.Available && slotTimeStr > startTime {
+			firstUnavailableSlot = &slot
+			break
+		}
 	}
 
-	keyboard := h.createUnavailableEndTimeKeyboard(startTime, nearestAppointment)
+	if firstUnavailableSlot != nil {
+		unavailableStart, _ := time.Parse(time.RFC3339, firstUnavailableSlot.StartTime)
+		unavailableStartLocal := unavailableStart.In(util.GetAppTimezone())
+
+		// Build slot details with enhanced information
+		slotDetails := fmt.Sprintf("Unavailable slot at %s", unavailableStartLocal.Format("15:04"))
+		if firstUnavailableSlot.Type != "" {
+			slotDetails += fmt.Sprintf(" (%s)", firstUnavailableSlot.Type)
+		}
+		if firstUnavailableSlot.Description != "" {
+			slotDetails += fmt.Sprintf(" - %s", firstUnavailableSlot.Description)
+		}
+
+		text += fmt.Sprintf("\n\n"+UIMsgUnavailableSlotWarning, unavailableStartLocal.Format("15:04"), slotDetails)
+	}
+
+	keyboard := h.createUnavailableEndTimeKeyboard(startTime, availability)
 
 	// If no slots available, show a message
 	if len(keyboard.InlineKeyboard) == 1 && len(keyboard.InlineKeyboard[0]) == 1 && keyboard.InlineKeyboard[0][0].Text == "❌ Cancel" {
-		text += "\n\n❌ No available time slots before your nearest appointment."
+		text += "\n\n" + UIMsgNoAvailableTimeSlots
 	}
 
 	h.sendMessageWithKeyboard(chatID, text, keyboard)
@@ -381,10 +373,10 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(chatID int64, en
 
 	// Store end time and ask for description
 	user.State = models.StateWaitingForUnavailableDescription
-	user.SelectedEndTime = endTime
+	user.SelectedUnavailableEndTime = endTime
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := fmt.Sprintf(UIMsgUnavailableDescription, user.SelectedDate, user.SelectedTime, endTime)
+	text := fmt.Sprintf(UIMsgUnavailableDescription, user.SelectedDate, user.SelectedUnavailableStartTime, endTime)
 	h.sendMessage(chatID, text)
 }
 
@@ -398,8 +390,8 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, descrip
 	}
 
 	// Create unavailable appointment
-	start, _ := time.Parse("15:04", user.SelectedTime)
-	end, _ := time.Parse("15:04", user.SelectedEndTime)
+	start, _ := time.Parse("15:04", user.SelectedUnavailableStartTime)
+	end, _ := time.Parse("15:04", user.SelectedUnavailableEndTime)
 	date := user.SelectedDate
 
 	// Parse the date and combine with times
@@ -428,13 +420,12 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, descrip
 		h.sendError(chatID, ErrorMsgFailedToCreateUnavailableAppointment, err)
 		return
 	}
-
 	// Clear state
 	h.clearUnavailableState(user)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	text := fmt.Sprintf(SuccessMsgUnavailablePeriodSet,
-		date, user.SelectedTime, user.SelectedEndTime, appointment.Description)
+		date, start.Format("15:04"), end.Format("15:04"), appointment.Appointment.Description)
 
 	h.sendMessage(chatID, text)
 	h.ShowDashboard(chatID, user)
