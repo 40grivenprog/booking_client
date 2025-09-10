@@ -309,6 +309,9 @@ func formatProfessionalAppointmentDetails(apt *models.ProfessionalAppointment, i
 func (h *ProfessionalHandler) createProfessionalDashboardKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(BtnMyTimetable, "professional_timetable"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(BtnPendingAppointments, "professional_pending_appointments"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
@@ -548,6 +551,43 @@ func (h *ProfessionalHandler) createUpcomingAppointmentsDateKeyboard(dates []str
 
 	if len(currentRow) > 0 {
 		rows = append(rows, currentRow)
+	}
+
+	// Add back to dashboard button
+	backButton := tgbotapi.NewInlineKeyboardButtonData(BtnBackToDashboard, "back_to_dashboard")
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// createTimetableKeyboard creates a keyboard for timetable with day navigation and appointment actions
+func (h *ProfessionalHandler) createTimetableKeyboard(dateStr string, appointments []models.TimetableAppointment) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	// Add day navigation buttons
+	currentDate, _ := time.Parse("2006-01-02", dateStr)
+	today := time.Now()
+	isToday := currentDate.Year() == today.Year() && currentDate.Month() == today.Month() && currentDate.Day() == today.Day()
+
+	var navButtons []tgbotapi.InlineKeyboardButton
+	if !isToday {
+		prevButton := tgbotapi.NewInlineKeyboardButtonData(BtnPreviousTimetableDay, "prev_timetable_day_"+dateStr)
+		navButtons = append(navButtons, prevButton)
+	}
+	nextButton := tgbotapi.NewInlineKeyboardButtonData(BtnNextTimetableDay, "next_timetable_day_"+dateStr)
+	navButtons = append(navButtons, nextButton)
+
+	if len(navButtons) > 0 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(navButtons...))
+	}
+
+	// Add appointment cancel buttons
+	for i, apt := range appointments {
+		cancelButton := tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf(BtnCancelTimetableSlot, i+1),
+			fmt.Sprintf("cancel_appointment_%s", apt.ID),
+		)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(cancelButton))
 	}
 
 	// Add back to dashboard button

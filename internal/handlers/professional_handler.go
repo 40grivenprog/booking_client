@@ -160,9 +160,9 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, u
 	}
 
 	if len(datesResponse.Dates) == 0 {
-		h.sendMessage(chatID, UIMsgNoUpcomingAppointments)
-		h.ShowDashboard(chatID, user)
-		return
+		date, _ := time.Parse("2006-01", currentMonth)
+		formattedDate := date.Format("January 2006")
+		h.sendMessage(chatID, fmt.Sprintf(UIMsgNoUpcomingAppointmentsForMonth, formattedDate))
 	}
 
 	text := UIMsgSelectUpcomingAppointmentsDate
@@ -186,7 +186,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(chatID i
 
 	// Calculate new month based on direction
 	var newMonth time.Time
-	if direction == "prev" {
+	if direction == DirectionPrev {
 		newMonth = currentMonth.AddDate(0, -1, 0)
 	} else {
 		newMonth = currentMonth.AddDate(0, 1, 0)
@@ -194,35 +194,75 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(chatID i
 
 	newMonthStr := newMonth.Format("2006-01")
 
-	// Get dates with appointments for the new month
-	datesResponse, err := h.apiService.GetProfessionalAppointmentDates(user.ID, newMonthStr)
+	h.showUpcomingAppointmentsDatePicker(chatID, user, newMonthStr)
+}
+
+// HandleTimetable handles the timetable button click
+func (h *ProfessionalHandler) HandleTimetable(chatID int64) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Show timetable for today
+	h.showTimetable(chatID, user, time.Now().Format("2006-01-02"))
+}
+
+// showTimetable shows the timetable for a specific date
+func (h *ProfessionalHandler) showTimetable(chatID int64, user *models.User, dateStr string) {
+	// Get timetable for the date
+	timetableResponse, err := h.apiService.GetProfessionalTimetable(user.ID, dateStr)
 	if err != nil {
 		h.sendError(chatID, ErrorMsgFailedToLoadUpcomingAppointments, err)
 		return
 	}
+	text := fmt.Sprintf(UIMsgTimetableEmpty, dateStr)
+	if len(timetableResponse.Appointments) > 0 {
+		text = fmt.Sprintf(UIMsgTimetableHeader, dateStr)
+	}
 
-	if len(datesResponse.Dates) == 0 {
-		// If no appointments in this month, go back to previous month
-		var previousMonth time.Time
-		if direction == "prev" {
-			// If we went to previous month and it's empty, go back to current month
-			previousMonth = time.Now()
-		} else {
-			// If we went to next month and it's empty, go back to previous month
-			previousMonth = newMonth.AddDate(0, -1, 0)
-		}
+	for i, apt := range timetableResponse.Appointments {
+		startTime, _ := time.Parse(time.RFC3339, apt.StartTime)
+		endTime, _ := time.Parse(time.RFC3339, apt.EndTime)
 
-		previousMonthStr := previousMonth.Format("2006-01")
-		h.sendMessage(chatID, UIMsgNoUpcomingAppointments)
+		text += fmt.Sprintf(UIMsgTimetableSlot,
+			i+1,
+			startTime.Format("15:04"),
+			endTime.Format("15:04"),
+			apt.Description)
+	}
 
-		// Show the previous month
-		h.showUpcomingAppointmentsDatePicker(chatID, user, previousMonthStr)
+	// Create keyboard with day navigation and appointment actions
+	keyboard := h.createTimetableKeyboard(dateStr, timetableResponse.Appointments)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleTimetableDateNavigation handles day navigation for timetable
+func (h *ProfessionalHandler) HandleTimetableDateNavigation(chatID int64, dateStr string, direction string) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
 		return
 	}
 
-	text := UIMsgSelectUpcomingAppointmentsDate
-	keyboard := h.createUpcomingAppointmentsDateKeyboard(datesResponse.Dates, newMonthStr)
-	h.sendMessageWithKeyboard(chatID, text, keyboard)
+	// Parse current date
+	currentDate, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgInvalidDateFormat, err)
+		return
+	}
+
+	// Calculate new date based on direction
+	var newDate time.Time
+	if direction == DirectionPrev {
+		newDate = currentDate.AddDate(0, 0, -1)
+	} else {
+		newDate = currentDate.AddDate(0, 0, 1)
+	}
+
+	newDateStr := newDate.Format("2006-01-02")
+
+	// Show timetable for the new date
+	h.showTimetable(chatID, user, newDateStr)
 }
 
 // HandleUpcomingAppointmentsDateSelection handles selection of a date for upcoming appointments

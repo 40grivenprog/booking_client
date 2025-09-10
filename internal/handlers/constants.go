@@ -28,25 +28,27 @@ const (
 
 // UI messages
 const (
-	UIMsgClientRegistration     = "👤 Client Registration\n\nPlease enter your first name:"
-	UIMsgWelcomeBack            = "👋 Welcome back, %s!\n\nYou are registered as a %s.\n\nWhat would you like to do?"
-	UIMsgSelectProfessional     = "👨‍💼 Please select a professional:"
-	UIMsgSelectDate             = "📅 Select a date (%s %d):"
-	UIMsgSelectTime             = "🕐 Select a time slot for %s:"
-	UIMsgNoPendingAppointments  = "📋 You have no pending appointments."
-	UIMsgNoUpcomingAppointments = "📋 You have no upcoming appointments."
-	UIMsgPendingAppointments    = "⏳ Your Pending Appointments:\n\n"
-	UIMsgUpcomingAppointments   = "📋 Your Upcoming Appointments:\n\n"
-	UIMsgCancellationReason     = "Please provide a reason for cancelling this appointment:"
-	UIMsgNewAppointmentRequest  = "🔔 New Appointment Request!\n\n👤 Client: %s %s\n📅 Date: %s\n🕐 Time: %s - %s\n📝 Description: %s\n\nPlease confirm or cancel this appointment."
-	UIMsgAppointmentCancelled   = "🔔 Appointment Cancelled\n\n👤 Client: %s %s\n📅 Date: %s\n🕐 Time: %s - %s\n📝 Reason: %s"
+	UIMsgClientRegistration             = "👤 Client Registration\n\nPlease enter your first name:"
+	UIMsgWelcomeBack                    = "👋 Welcome back, %s!\n\nYou are registered as a %s.\n\nWhat would you like to do?"
+	UIMsgSelectProfessional             = "👨‍💼 Please select a professional:"
+	UIMsgSelectDate                     = "📅 Select a date (%s %d):"
+	UIMsgSelectTime                     = "🕐 Select a time slot for %s:"
+	UIMsgNoPendingAppointments          = "📋 You have no pending appointments."
+	UIMsgNoUpcomingAppointments         = "📋 You have no upcoming appointments."
+	UIMsgNoUpcomingAppointmentsForMonth = "📋 You have no upcoming appointments for this month(%s)"
+	UIMsgPendingAppointments            = "⏳ Your Pending Appointments:\n\n"
+	UIMsgUpcomingAppointments           = "📋 Your Upcoming Appointments:\n\n"
+	UIMsgCancellationReason             = "Please provide a reason for cancelling this appointment:"
+	UIMsgNewAppointmentRequest          = "🔔 New Appointment Request!\n\n👤 Client: %s %s\n📅 Date: %s\n🕐 Time: %s - %s\n📝 Description: %s\n\nPlease confirm or cancel this appointment."
+	UIMsgAppointmentCancelled           = "🔔 Appointment Cancelled\n\n👤 Client: %s %s\n📅 Date: %s\n🕐 Time: %s - %s\n📝 Reason: %s"
 )
 
 // Button texts
 const (
 	BtnBookAppointment          = "📅 Book Appointment"
 	BtnMyPendingAppointments    = "⏳ My Pending Appointments"
-	BtnMyUpcomingAppointments   = "📋 My Upcoming Appointments"
+	BtnMyUpcomingAppointments   = "✅ My Upcoming Appointments"
+	BtnMyTimetable              = "📅 My Timetable"
 	BtnCancelBooking            = "❌ Cancel Booking"
 	BtnCancelAppointment        = "❌ Cancel Appointment #%d"
 	BtnBackToDashboard          = "🏠 Back to Dashboard"
@@ -84,7 +86,10 @@ const (
 	UIMsgUnavailableDescription             = "📝 Please provide a description for your unavailable period:\n\n📅 Date: %s\n🕐 Time: %s - %s\n\nExample: \"Personal break\", \"Lunch time\", \"Out of office\", etc."
 	UIMsgUnavailableSlotWarning             = "⚠️ You can only select times before %s (%s)"
 	UIMsgNoAvailableTimeSlots               = "❌ No available time slots before your next unavailable period."
-	UIMsgSelectUpcomingAppointmentsDate     = "📅 Select a date to view upcoming appointments:"
+	UIMsgSelectUpcomingAppointmentsDate     = "📅 Here are the dates with upcoming appointments. Select a date to view upcoming appointments:"
+	UIMsgTimetableEmpty                     = "📋 No activities scheduled for this day(%s)."
+	UIMsgTimetableHeader                    = "📋 Your Timetable for %s:\n\n"
+	UIMsgTimetableSlot                      = "📅 Slot #%d:\n🕐 %s - %s\n📝 %s\n\n"
 	UIMsgAppointmentConfirmed               = "✅ Appointment Confirmed!\n\n📅 Date: %s\n🕐 Time: %s - %s\n👨‍💼 Professional: %s %s\n\nYour appointment has been confirmed."
 	UIMsgAppointmentCancelledByProfessional = "🔔 Appointment Cancelled by Professional\n\n📅 Date: %s\n🕐 Time: %s - %s\n👨‍💼 Professional: %s %s\n📝 Reason: %s"
 )
@@ -100,6 +105,15 @@ const (
 	BtnPreviousUnavailableMonth = "⬅️ Previous"
 	BtnNextUnavailableMonth     = "Next ➡️"
 	BtnCancelUnavailable        = "❌ Cancel"
+	BtnPreviousTimetableDay     = "⬅️ Previous Day"
+	BtnNextTimetableDay         = "Next Day ➡️"
+	BtnCancelTimetableSlot      = "❌ Cancel Slot #%d"
+)
+
+// Navigation directions
+const (
+	DirectionPrev = "prev"
+	DirectionNext = "next"
 )
 
 // Keyboard layouts

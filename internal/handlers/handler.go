@@ -104,12 +104,20 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		h.professionalHandler.HandlePendingAppointments(chatID)
 	case data == "professional_upcoming_appointments":
 		h.professionalHandler.HandleUpcomingAppointments(chatID)
+	case data == "professional_timetable":
+		h.professionalHandler.HandleTimetable(chatID)
+	case len(data) >= 19 && data[:19] == "prev_timetable_day_":
+		date := data[19:]
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, DirectionPrev)
+	case len(data) >= 19 && data[:19] == "next_timetable_day_":
+		date := data[19:]
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, DirectionNext)
 	case len(data) >= 20 && data[:20] == "prev_upcoming_month_":
 		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, "prev")
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, DirectionPrev)
 	case len(data) >= 20 && data[:20] == "next_upcoming_month_":
 		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, "next")
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, DirectionNext)
 	case len(data) >= 21 && data[:21] == "select_upcoming_date_":
 		date := data[21:]
 		h.professionalHandler.HandleUpcomingAppointmentsDateSelection(chatID, date)

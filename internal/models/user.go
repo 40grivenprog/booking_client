@@ -226,3 +226,17 @@ type UnavailableAppointment struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
+
+// TimetableAppointment represents an appointment in the timetable
+type TimetableAppointment struct {
+	ID          string `json:"id"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	Description string `json:"description"`
+}
+
+// GetProfessionalTimetableResponse represents the response for getting professional timetable
+type GetProfessionalTimetableResponse struct {
+	Date         string                 `json:"date"`
+	Appointments []TimetableAppointment `json:"appointments"`
+}

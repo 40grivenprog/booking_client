@@ -589,6 +589,29 @@ func (s *APIService) GetProfessionalAppointmentsByDate(professionalID, status, d
 	return &response, nil
 }
 
+// GetProfessionalTimetable gets the professional's timetable for a specific date
+func (s *APIService) GetProfessionalTimetable(professionalID, date string) (*models.GetProfessionalTimetableResponse, error) {
+	url := fmt.Sprintf("%s/api/professionals/%s/timetable?date=%s", s.baseURL, professionalID, date)
+
+	resp, err := s.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get timetable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var response models.GetProfessionalTimetableResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &response, nil
+}
+
 // GetUserRepository returns the user repository for direct access if needed
 func (s *APIService) GetUserRepository() *repository.UserRepository {
 	return s.userRepository
