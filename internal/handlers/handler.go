@@ -104,6 +104,8 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		h.professionalHandler.HandlePendingAppointments(chatID)
 	case data == "professional_upcoming_appointments":
 		h.professionalHandler.HandleUpcomingAppointments(chatID)
+	case data == "set_unavailable":
+		h.professionalHandler.HandleSetUnavailable(chatID)
 	case data == "cancel_booking":
 		h.clientHandler.HandleCancelBooking(chatID)
 	case len(data) > 20 && data[:20] == "select_professional_":
@@ -128,6 +130,21 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 	case len(data) > 20 && data[:17] == "cancel_prof_appt_":
 		appointmentID := data[17:]
 		h.professionalHandler.HandleCancelAppointment(chatID, appointmentID)
+	case len(data) >= 24 && data[:24] == "select_unavailable_date_":
+		date := data[24:]
+		h.professionalHandler.HandleUnavailableDateSelection(chatID, date)
+	case len(data) >= 25 && data[:25] == "select_unavailable_start_":
+		startTime := data[25:]
+		h.professionalHandler.HandleUnavailableStartTimeSelection(chatID, startTime)
+	case len(data) >= 23 && data[:23] == "select_unavailable_end_":
+		endTime := data[23:]
+		h.professionalHandler.HandleUnavailableEndTimeSelection(chatID, endTime)
+	case data == "prev_unavailable_month":
+		h.professionalHandler.HandlePrevUnavailableMonth(chatID)
+	case data == "next_unavailable_month":
+		h.professionalHandler.HandleNextUnavailableMonth(chatID)
+	case data == "cancel_unavailable":
+		h.professionalHandler.HandleCancelUnavailable(chatID)
 	case data == "back_to_dashboard":
 		user, exists := h.apiService.GetUserRepository().GetUser(chatID)
 		if !exists || user == nil {
@@ -212,6 +229,8 @@ func (h *Handler) handleUserInput(chatID int64, text string) {
 		} else {
 			h.clientHandler.HandleCancellationReason(chatID, text)
 		}
+	case models.StateWaitingForUnavailableDescription:
+		h.professionalHandler.HandleUnavailableDescription(chatID, text)
 	default:
 		h.sendUnknownCommand(chatID)
 	}

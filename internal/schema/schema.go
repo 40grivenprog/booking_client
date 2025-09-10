@@ -33,3 +33,11 @@ type CancelAppointmentRequest struct {
 type ConfirmAppointmentRequest struct {
 	// No additional fields needed for confirmation
 }
+
+// CreateUnavailableAppointmentRequest represents a request to create an unavailable appointment
+type CreateUnavailableAppointmentRequest struct {
+	ProfessionalID string `json:"professional_id" binding:"required"`
+	StartAt        string `json:"start_at" binding:"required"`
+	EndAt          string `json:"end_at" binding:"required"`
+	Description    string `json:"description" binding:"required"`
+}

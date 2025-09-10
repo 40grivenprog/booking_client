@@ -486,6 +486,73 @@ func (s *APIService) CancelProfessionalAppointment(professionalID, appointmentID
 	return &response, nil
 }
 
+// CreateUnavailableAppointment creates an unavailable appointment for a professional
+func (s *APIService) CreateUnavailableAppointment(req *schema.CreateUnavailableAppointmentRequest) (*models.CreateUnavailableAppointmentResponse, error) {
+	url := fmt.Sprintf("%s/api/professionals/%s/unavailable_appointments", s.baseURL, req.ProfessionalID)
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var response models.CreateUnavailableAppointmentResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// GetProfessionalAppointmentsByDate retrieves professional appointments with status and date filters
+func (s *APIService) GetProfessionalAppointmentsByDate(professionalID, status, date string) (*models.GetProfessionalAppointmentsResponse, error) {
+	url := fmt.Sprintf("%s/api/professionals/%s/appointments?status=%s&date=%s", s.baseURL, professionalID, status, date)
+
+	resp, err := s.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var response models.GetProfessionalAppointmentsResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
 // GetUserRepository returns the user repository for direct access if needed
 func (s *APIService) GetUserRepository() *repository.UserRepository {
 	return s.userRepository

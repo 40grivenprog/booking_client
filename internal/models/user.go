@@ -12,6 +12,8 @@ type User struct {
 	State                  string  `json:"state,omitempty"`                    // Bot interaction state
 	SelectedProfessionalID string  `json:"selected_professional_id,omitempty"` // Temporary storage for appointment booking
 	SelectedDate           string  `json:"selected_date,omitempty"`            // Temporary storage for selected date
+	SelectedTime           string  `json:"selected_time,omitempty"`            // Temporary storage for selected time
+	SelectedEndTime        string  `json:"selected_end_time,omitempty"`        // Temporary storage for selected end time
 	SelectedAppointmentID  string  `json:"selected_appointment_id,omitempty"`  // Temporary storage for appointment cancellation
 	CreatedAt              string  `json:"created_at"`
 	UpdatedAt              string  `json:"updated_at"`
@@ -33,6 +35,12 @@ const (
 	StateWaitingForTimeSelection         = "waiting_for_time_selection"
 	StateWaitingForCancellationReason    = "waiting_for_cancellation_reason"
 	StateBookingAppointment              = "booking_appointment" // General state during booking process
+
+	// Unavailable appointment states
+	StateWaitingForUnavailableDateSelection = "waiting_for_unavailable_date_selection"
+	StateWaitingForUnavailableStartTime     = "waiting_for_unavailable_start_time"
+	StateWaitingForUnavailableEndTime       = "waiting_for_unavailable_end_time"
+	StateWaitingForUnavailableDescription   = "waiting_for_unavailable_description"
 )
 
 // Appointment represents an appointment
@@ -191,4 +199,16 @@ type CancelProfessionalAppointmentResponse struct {
 	Appointment  CancelledAppointment          `json:"appointment"`
 	Client       ProfessionalAppointmentClient `json:"client"`
 	Professional Professional                  `json:"professional"`
+}
+
+// CreateUnavailableAppointmentResponse represents the response after creating an unavailable appointment
+type CreateUnavailableAppointmentResponse struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }

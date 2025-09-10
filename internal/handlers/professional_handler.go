@@ -2,29 +2,32 @@ package handlers
 
 import (
 	"fmt"
+	"time"
 
 	"booking_client/internal/models"
 	"booking_client/internal/schema"
 	"booking_client/internal/services"
+	"booking_client/internal/util"
 	"booking_client/pkg/telegram"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog"
 )
 
 // ProfessionalHandler handles all professional-related operations
 type ProfessionalHandler struct {
-	bot        *telegram.Bot
-	logger     *zerolog.Logger
-	apiService *services.APIService
+	bot                 *telegram.Bot
+	logger              *zerolog.Logger
+	apiService          *services.APIService
+	notificationService *NotificationService
 }
 
 // NewProfessionalHandler creates a new professional handler
 func NewProfessionalHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *services.APIService) *ProfessionalHandler {
 	return &ProfessionalHandler{
-		bot:        bot,
-		logger:     logger,
-		apiService: apiService,
+		bot:                 bot,
+		logger:              logger,
+		apiService:          apiService,
+		notificationService: NewNotificationService(bot, logger),
 	}
 }
 
@@ -40,41 +43,22 @@ func (h *ProfessionalHandler) StartSignIn(chatID int64) {
 	// Store in memory for state tracking
 	h.apiService.GetUserRepository().SetUser(chatID, tempUser)
 
-	text := `👨‍💼 Professional Sign In
-
-Please enter your username:`
-
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send professional sign-in message")
-	}
+	h.sendMessage(chatID, UIMsgProfessionalSignIn)
 }
 
 // ShowDashboard shows the professional dashboard with appointment options
 func (h *ProfessionalHandler) ShowDashboard(chatID int64, user *models.User) {
-	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	currentUser, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
-	user.State = models.StateNone
-	h.apiService.GetUserRepository().SetUser(chatID, user)
-	text := fmt.Sprintf(`👋 Welcome back, %s!
+	currentUser.State = models.StateNone
+	h.apiService.GetUserRepository().SetUser(chatID, currentUser)
 
-You are registered as a %s.
+	text := fmt.Sprintf(UIMsgWelcomeBackProfessional, currentUser.LastName, currentUser.Role)
+	keyboard := h.createProfessionalDashboardKeyboard()
 
-What would you like to do?`, user.LastName, user.Role)
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⏳ Pending Appointments", "professional_pending_appointments"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📋 Upcoming Appointments", "professional_upcoming_appointments"),
-		),
-	)
-
-	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send professional dashboard message")
-	}
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
 }
 
 // HandleUsernameInput handles username input for professional sign-in
@@ -87,13 +71,7 @@ func (h *ProfessionalHandler) HandleUsernameInput(chatID int64, username string)
 	user.State = models.StateWaitingForPassword
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := `✅ Username saved!
-
-Please enter your password:`
-
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send password request")
-	}
+	h.sendMessage(chatID, SuccessMsgUsernameSaved)
 }
 
 // HandlePasswordInput handles password input for professional sign-in
@@ -112,10 +90,7 @@ func (h *ProfessionalHandler) HandlePasswordInput(chatID int64, password string)
 
 	signedInUser, err := h.apiService.SignInProfessional(req)
 	if err != nil {
-		text := fmt.Sprintf("❌ Sign in failed: %v", err)
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send sign-in error")
-		}
+		h.sendError(chatID, ErrorMsgSignInFailed, err)
 		return
 	}
 
@@ -123,16 +98,8 @@ func (h *ProfessionalHandler) HandlePasswordInput(chatID int64, password string)
 	user.State = models.StateNone
 	h.apiService.GetUserRepository().SetUser(chatID, signedInUser)
 
-	text := fmt.Sprintf(`✅ Sign in successful!
-
-Welcome back, %s %s!
-Role: %s
-Username: %s
-Chat ID: %d`, signedInUser.FirstName, signedInUser.LastName, signedInUser.Role, signedInUser.Username, chatID)
-
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send sign-in success")
-	}
+	text := fmt.Sprintf(SuccessMsgSignInSuccessful, signedInUser.FirstName, signedInUser.LastName, signedInUser.Role, signedInUser.Username, chatID)
+	h.sendMessage(chatID, text)
 	h.ShowDashboard(chatID, signedInUser)
 }
 
@@ -145,53 +112,23 @@ func (h *ProfessionalHandler) HandlePendingAppointments(chatID int64) {
 
 	appointments, err := h.apiService.GetProfessionalAppointments(user.ID, "pending")
 	if err != nil {
-		text := fmt.Sprintf("❌ Failed to load pending appointments: %v", err)
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send error message")
-		}
+		h.sendError(chatID, ErrorMsgFailedToLoadPendingAppointments, err)
 		return
 	}
 
 	if len(appointments.Appointments) == 0 {
-		text := "📋 You have no pending appointments."
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
-		}
+		h.sendMessage(chatID, UIMsgNoPendingAppointments)
 		h.ShowDashboard(chatID, user)
 		return
 	}
 
-	text := "⏳ Your Pending Appointments:\n\n"
-	var rows [][]tgbotapi.InlineKeyboardButton
-
+	text := UIMsgPendingAppointments
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n📝 %s\n\n",
-			index+1,
-			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Client.FirstName, apt.Client.LastName,
-			apt.Description)
-
-		// Add confirm and cancel buttons
-		confirmButton := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("✅ Confirm Appointment #%d", index+1),
-			fmt.Sprintf("confirm_appointment_%s", apt.ID),
-		)
-		cancelButton := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("❌ Cancel Appointment #%d", index+1),
-			fmt.Sprintf("cancel_prof_appt_%s", apt.ID),
-		)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(confirmButton, cancelButton))
+		text += formatProfessionalAppointmentDetails(&apt, index)
 	}
 
-	// Add back to dashboard button
-	backButton := tgbotapi.NewInlineKeyboardButtonData("🏠 Back to Dashboard", "back_to_dashboard")
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
-
-	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send pending appointments")
-	}
+	keyboard := h.createProfessionalAppointmentsKeyboard(appointments.Appointments, true)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
 }
 
 // HandleUpcomingAppointments shows upcoming appointments for professionals
@@ -203,49 +140,23 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
 
 	appointments, err := h.apiService.GetProfessionalAppointments(user.ID, "confirmed")
 	if err != nil {
-		text := fmt.Sprintf("❌ Failed to load upcoming appointments: %v", err)
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send error message")
-		}
+		h.sendError(chatID, ErrorMsgFailedToLoadUpcomingAppointments, err)
 		return
 	}
 
 	if len(appointments.Appointments) == 0 {
-		text := "📋 You have no upcoming appointments."
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send no appointments message")
-		}
+		h.sendMessage(chatID, UIMsgNoUpcomingAppointments)
 		h.ShowDashboard(chatID, user)
 		return
 	}
 
-	text := "📋 Your Upcoming Appointments:\n\n"
-	var rows [][]tgbotapi.InlineKeyboardButton
-
+	text := UIMsgUpcomingAppointments
 	for index, apt := range appointments.Appointments {
-		text += fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n📝 %s\n\n",
-			index+1,
-			apt.StartTime[:10], apt.StartTime[11:16], apt.EndTime[11:16],
-			apt.Client.FirstName, apt.Client.LastName,
-			apt.Description)
-
-		// Add cancel button for upcoming appointments
-		cancelButton := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("❌ Cancel Appintment %d", index+1),
-			fmt.Sprintf("cancel_prof_appt_%s", apt.ID),
-		)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(cancelButton))
+		text += formatProfessionalAppointmentDetails(&apt, index)
 	}
 
-	// Add back to dashboard button
-	backButton := tgbotapi.NewInlineKeyboardButtonData("🏠 Back to Dashboard", "back_to_dashboard")
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
-
-	if err := h.bot.SendMessageWithKeyboard(chatID, text, keyboard); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send upcoming appointments")
-	}
+	keyboard := h.createProfessionalAppointmentsKeyboard(appointments.Appointments, false)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
 }
 
 // HandleConfirmAppointment confirms an appointment by professional
@@ -260,33 +171,19 @@ func (h *ProfessionalHandler) HandleConfirmAppointment(chatID int64, appointment
 
 	response, err := h.apiService.ConfirmProfessionalAppointment(user.ID, appointmentID, req)
 	if err != nil {
-		text := fmt.Sprintf("❌ Failed to confirm appointment: %v", err)
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send confirmation error")
-		}
+		h.sendError(chatID, ErrorMsgFailedToConfirmAppointment, err)
 		return
 	}
-	fmt.Println("response", response.Appointment.StartTime)
 
-	text := fmt.Sprintf(`✅ Appointment confirmed successfully!
+	date, startTime, endTime := formatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
+	text := fmt.Sprintf(SuccessMsgAppointmentConfirmed,
+		date, startTime, endTime,
+		response.Client.FirstName, response.Client.LastName)
 
-📅 Date: %s
-🕐 Time: %s - %s
-👤 Client: %s %s`,
-		response.Appointment.StartTime[:10],
-		response.Appointment.StartTime[11:16],
-		response.Appointment.EndTime[11:16],
-		response.Client.FirstName,
-		response.Client.LastName)
-
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send confirmation success")
-	}
+	h.sendMessage(chatID, text)
 
 	// Notify client about confirmation
-	h.notifyClientAppointmentConfirmation(response)
-
-	// Show dashboard
+	h.notificationService.NotifyClientAppointmentConfirmation(response)
 	h.ShowDashboard(chatID, user)
 }
 
@@ -302,10 +199,7 @@ func (h *ProfessionalHandler) HandleCancelAppointment(chatID int64, appointmentI
 	user.SelectedAppointmentID = appointmentID
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := "Please provide a reason for cancelling this appointment:"
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send cancellation reason request")
-	}
+	h.sendMessage(chatID, UIMsgCancellationReason)
 }
 
 // HandleCancellationReason handles the professional cancellation reason input
@@ -323,10 +217,7 @@ func (h *ProfessionalHandler) HandleCancellationReason(chatID int64, reason stri
 
 	response, err := h.apiService.CancelProfessionalAppointment(user.ID, appointmentID, req)
 	if err != nil {
-		text := fmt.Sprintf("❌ Failed to cancel appointment: %v", err)
-		if err := h.bot.SendMessage(chatID, text); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to send cancellation error")
-		}
+		h.sendError(chatID, ErrorMsgFailedToCancelAppointment, err)
 		return
 	}
 
@@ -335,75 +226,261 @@ func (h *ProfessionalHandler) HandleCancellationReason(chatID int64, reason stri
 	user.SelectedAppointmentID = ""
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := fmt.Sprintf(`✅ Appointment cancelled successfully!
-
-📅 Date: %s
-🕐 Time: %s - %s
-👤 Client: %s %s
-📝 Reason: %s`,
-		response.Appointment.StartTime[:10],
-		response.Appointment.StartTime[11:16],
-		response.Appointment.EndTime[11:16],
-		response.Client.FirstName,
-		response.Client.LastName,
+	date, startTime, endTime := formatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
+	text := fmt.Sprintf(SuccessMsgAppointmentCancelled,
+		date, startTime, endTime,
+		response.Client.FirstName, response.Client.LastName,
 		response.Appointment.CancellationReason)
 
-	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send cancellation success")
-	}
+	h.sendMessage(chatID, text)
 
 	// Notify client about cancellation
-	h.notifyClientProfessionalCancellation(response)
-
-	// Show dashboard
+	h.notificationService.NotifyClientProfessionalCancellation(response)
 	h.ShowDashboard(chatID, user)
 }
 
-// notifyClientAppointmentConfirmation sends notification to client about appointment confirmation
-func (h *ProfessionalHandler) notifyClientAppointmentConfirmation(response *models.ConfirmProfessionalAppointmentResponse) {
-	if response.Client.ChatID == nil || *response.Client.ChatID == 0 {
-		return // No chat ID for client
+// HandleSetUnavailable starts the unavailable appointment setting process
+func (h *ProfessionalHandler) HandleSetUnavailable(chatID int64) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
 	}
 
-	text := fmt.Sprintf(`✅ Appointment Confirmed!
+	// Set state for unavailable appointment
+	user.State = models.StateWaitingForUnavailableDateSelection
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-📅 Date: %s
-🕐 Time: %s - %s
-👨‍💼 Professional: %s %s
-
-Your appointment has been confirmed.`,
-		response.Appointment.StartTime[:10],
-		response.Appointment.StartTime[11:16],
-		response.Appointment.EndTime[11:16],
-		response.Professional.FirstName,
-		response.Professional.LastName)
-
-	if err := h.bot.SendMessage(*response.Client.ChatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send client confirmation notification")
-	}
+	// Show current month dates
+	h.showUnavailableDateSelection(chatID, time.Now())
 }
 
-// notifyClientProfessionalCancellation sends notification to client about appointment cancellation by professional
-func (h *ProfessionalHandler) notifyClientProfessionalCancellation(response *models.CancelProfessionalAppointmentResponse) {
-	fmt.Println("response", response.Client.ChatID)
-	if response.Client.ChatID == nil || *response.Client.ChatID == 0 {
-		return // No chat ID for client
+// showUnavailableDateSelection shows available dates for the current month
+func (h *ProfessionalHandler) showUnavailableDateSelection(chatID int64, currentDate time.Time) {
+	text := fmt.Sprintf(UIMsgSelectUnavailableDate, currentDate.Month(), currentDate.Year())
+	keyboard := h.createUnavailableDateKeyboard(currentDate)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableDateSelection handles when user selects a date for unavailable time
+func (h *ProfessionalHandler) HandleUnavailableDateSelection(chatID int64, date string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
 	}
 
-	text := fmt.Sprintf(`🔔 Appointment Cancelled by Professional
+	user.State = models.StateWaitingForUnavailableStartTime
+	user.SelectedDate = date
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-📅 Date: %s
-🕐 Time: %s - %s
-👨‍💼 Professional: %s %s
-📝 Reason: %s`,
-		response.Appointment.StartTime[:10],
-		response.Appointment.StartTime[11:16],
-		response.Appointment.EndTime[11:16],
-		response.Professional.FirstName,
-		response.Professional.LastName,
-		response.Appointment.CancellationReason)
-
-	if err := h.bot.SendMessage(*response.Client.ChatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send client cancellation notification")
+	// Get availability for selected date to show time slots
+	availability, err := h.apiService.GetProfessionalAvailability(user.ID, date)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgFailedToLoadAvailability, err)
+		return
 	}
+
+	h.showUnavailableStartTimeSelection(chatID, availability)
+}
+
+// showUnavailableStartTimeSelection shows available time slots for start time
+func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, availability *models.ProfessionalAvailabilityResponse) {
+	text := fmt.Sprintf(UIMsgSelectUnavailableStartTime, availability.Date)
+	keyboard := h.createUnavailableStartTimeKeyboard(availability)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableStartTimeSelection handles when user selects start time for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(chatID int64, startTime string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableStartTime,
+	})
+	if !valid {
+		return
+	}
+
+	user.State = models.StateWaitingForUnavailableEndTime
+	user.SelectedTime = startTime // Store start time temporarily
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	// Get appointments for this specific date to find the nearest appointment
+	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(user.ID, "confirmed", user.SelectedDate)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgFailedToLoadAppointments, err)
+		return
+	}
+
+	// Find the nearest appointment after the selected start time
+	var nearestAppointment *models.ProfessionalAppointment
+	selectedStart, _ := time.Parse("15:04", startTime)
+
+	for _, apt := range appointments.Appointments {
+		aptStart, err := time.Parse(time.RFC3339, apt.StartTime)
+		if err != nil {
+			continue
+		}
+		aptStartLocal := aptStart.In(util.GetAppTimezone())
+
+		if aptStartLocal.After(selectedStart) {
+			if nearestAppointment == nil {
+				nearestAppointment = &apt
+			} else {
+				nearestStart, err := time.Parse(time.RFC3339, nearestAppointment.StartTime)
+				if err == nil {
+					nearestStartLocal := nearestStart.In(util.GetAppTimezone())
+					if aptStartLocal.Before(nearestStartLocal) {
+						nearestAppointment = &apt
+					}
+				}
+			}
+		}
+	}
+
+	h.showUnavailableEndTimeSelection(chatID, startTime, nearestAppointment)
+}
+
+// showUnavailableEndTimeSelection shows available time slots for end time
+func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, nearestAppointment *models.ProfessionalAppointment) {
+	text := fmt.Sprintf(UIMsgSelectUnavailableEndTime, startTime)
+
+	if nearestAppointment != nil {
+		nearestStart, _ := time.Parse(time.RFC3339, nearestAppointment.StartTime)
+		nearestStartLocal := nearestStart.In(util.GetAppTimezone())
+
+		// Build appointment details
+		appointmentDetails := fmt.Sprintf("Appointment at %s", nearestStartLocal.Format("15:04"))
+		if nearestAppointment.Description != "" {
+			appointmentDetails += fmt.Sprintf(" - %s", nearestAppointment.Description)
+		}
+		if nearestAppointment.Client != nil {
+			appointmentDetails += fmt.Sprintf(" (Client: %s %s)", nearestAppointment.Client.FirstName, nearestAppointment.Client.LastName)
+		}
+
+		text += fmt.Sprintf("\n\n⚠️ You can only select times before %s (%s)", nearestStartLocal.Format("15:04"), appointmentDetails)
+	}
+
+	keyboard := h.createUnavailableEndTimeKeyboard(startTime, nearestAppointment)
+
+	// If no slots available, show a message
+	if len(keyboard.InlineKeyboard) == 1 && len(keyboard.InlineKeyboard[0]) == 1 && keyboard.InlineKeyboard[0][0].Text == "❌ Cancel" {
+		text += "\n\n❌ No available time slots before your nearest appointment."
+	}
+
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableEndTimeSelection handles when user selects end time for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(chatID int64, endTime string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableEndTime,
+	})
+	if !valid {
+		return
+	}
+
+	// Store end time and ask for description
+	user.State = models.StateWaitingForUnavailableDescription
+	user.SelectedEndTime = endTime
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	text := fmt.Sprintf(UIMsgUnavailableDescription, user.SelectedDate, user.SelectedTime, endTime)
+	h.sendMessage(chatID, text)
+}
+
+// HandleUnavailableDescription handles when user provides description for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, description string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDescription,
+	})
+	if !valid {
+		return
+	}
+
+	// Create unavailable appointment
+	start, _ := time.Parse("15:04", user.SelectedTime)
+	end, _ := time.Parse("15:04", user.SelectedEndTime)
+	date := user.SelectedDate
+
+	// Parse the date and combine with times
+	selectedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		h.sendMessage(chatID, ErrorMsgInvalidDateFormat)
+		return
+	}
+
+	// Combine date with times in application timezone
+	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+		start.Hour(), start.Minute(), 0, 0, util.GetAppTimezone())
+	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+		end.Hour(), end.Minute(), 0, 0, util.GetAppTimezone())
+
+	// Create unavailable appointment request
+	req := &schema.CreateUnavailableAppointmentRequest{
+		ProfessionalID: user.ID,
+		StartAt:        startDateTime.Format(time.RFC3339),
+		EndAt:          endDateTime.Format(time.RFC3339),
+		Description:    description,
+	}
+
+	appointment, err := h.apiService.CreateUnavailableAppointment(req)
+	if err != nil {
+		h.sendError(chatID, ErrorMsgFailedToCreateUnavailableAppointment, err)
+		return
+	}
+
+	// Clear state
+	h.clearUnavailableState(user)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	text := fmt.Sprintf(SuccessMsgUnavailablePeriodSet,
+		date, user.SelectedTime, user.SelectedEndTime, appointment.Description)
+
+	h.sendMessage(chatID, text)
+	h.ShowDashboard(chatID, user)
+}
+
+// HandleCancelUnavailable cancels the unavailable appointment setting process
+func (h *ProfessionalHandler) HandleCancelUnavailable(chatID int64) {
+	user, ok := getUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Clear all unavailable-related state
+	h.clearUnavailableState(user)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	h.sendMessage(chatID, ErrorMsgUnavailableCancelled)
+	h.ShowDashboard(chatID, user)
+}
+
+// HandlePrevUnavailableMonth handles previous month navigation for unavailable appointments
+func (h *ProfessionalHandler) HandlePrevUnavailableMonth(chatID int64) {
+	// Validate user state - only allow if waiting for unavailable date selection
+	_, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
+	}
+
+	// For simplicity, we'll just show current month again
+	// In a real implementation, you'd store the current month in user state
+	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, -1, 0))
+}
+
+// HandleNextUnavailableMonth handles next month navigation for unavailable appointments
+func (h *ProfessionalHandler) HandleNextUnavailableMonth(chatID int64) {
+	// Validate user state - only allow if waiting for unavailable date selection
+	_, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
+	}
+
+	// For simplicity, we'll just show current month again
+	// In a real implementation, you'd store the current month in user state
+	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, 1, 0))
 }
