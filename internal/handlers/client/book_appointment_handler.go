@@ -15,6 +15,7 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 	user, valid := h.validateUserState(chatID, []string{
 		models.StateNone,
 	})
+	fmt.Println("user", user.ID)
 	if !valid {
 		return
 	}

@@ -93,7 +93,7 @@ func (s *APIService) fetchUserFromAPI(chatID int64) (*models.User, error) {
 }
 
 // RegisterClient registers a new client
-func (s *APIService) RegisterClient(req *schema.RegisterRequest) (*models.User, error) {
+func (s *APIService) RegisterClient(req *schema.RegisterRequest) (*models.ClientRegisterResponse, error) {
 	url := fmt.Sprintf("%s/api/clients/register", s.baseURL)
 
 	jsonData, err := json.Marshal(req)
@@ -117,19 +117,14 @@ func (s *APIService) RegisterClient(req *schema.RegisterRequest) (*models.User, 
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var response struct {
-		User models.User `json:"user"`
-	}
-
+	var response models.ClientRegisterResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	// Store the newly registered user in local storage
-	s.userRepository.SetUser(req.ChatID, &response.User)
 	s.logger.Debug().Int64("chat_id", req.ChatID).Msg("Newly registered client stored in local storage")
 
-	return &response.User, nil
+	return &response, nil
 }
 
 // RegisterProfessional registers a new professional

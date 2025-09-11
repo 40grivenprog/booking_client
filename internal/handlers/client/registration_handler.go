@@ -88,18 +88,24 @@ func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
 		Role:        "client",
 	}
 
-	registeredUser, err := h.apiService.RegisterClient(req)
+	response, err := h.apiService.RegisterClient(req)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgRegistrationFailed, err)
 		return
 	}
-	fmt.Println("registeredUser", registeredUser)
-
+	user.ID = response.ID
+	user.FirstName = response.FirstName
+	user.LastName = response.LastName
+	user.Role = response.Role
+	user.PhoneNumber = response.PhoneNumber
+	user.ChatID = response.ChatID
+	user.CreatedAt = response.CreatedAt
+	user.UpdatedAt = response.UpdatedAt
 	// Clear state
 	user.State = models.StateNone
-	h.apiService.GetUserRepository().SetUser(chatID, registeredUser)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := fmt.Sprintf(common.SuccessMsgRegistrationSuccessful, registeredUser.FirstName, registeredUser.LastName, registeredUser.Role, chatID)
+	text := fmt.Sprintf(common.SuccessMsgRegistrationSuccessful, response.FirstName, response.LastName, response.Role, chatID)
 	keyboard := h.createRegistrationSuccessKeyboard()
 
 	id, err := h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
