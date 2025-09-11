@@ -118,10 +118,10 @@ func (h *ClientHandler) createDateKeyboard(currentDate time.Time) tgbotapi.Inlin
 	if len(currentRow) > 0 {
 		rows = append(rows, currentRow)
 	}
-
+	currentMonth := currentDate.Format("2006-01")
 	// Add navigation buttons
-	prevButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnPreviousMonth, "prev_month")
-	nextButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnNextMonth, "next_month")
+	prevButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnPreviousMonth, "prev_month_"+currentMonth)
+	nextButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnNextMonth, "next_month_"+currentMonth)
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(prevButton, nextButton))
 
 	// Add cancel booking button

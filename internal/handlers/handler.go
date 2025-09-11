@@ -137,10 +137,12 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 	case len(data) > 12 && data[:12] == "select_time_":
 		startTime := data[12:]
 		h.clientHandler.HandleTimeSelection(chatID, startTime)
-	case data == "prev_month":
-		h.clientHandler.HandlePrevMonth(chatID)
-	case data == "next_month":
-		h.clientHandler.HandleNextMonth(chatID)
+	case len(data) > 11 && data[:11] == "prev_month_":
+		month := data[11:]
+		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
+	case len(data) > 11 && data[:11] == "next_month_":
+		month := data[11:]
+		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
 	case len(data) > 19 && data[:19] == "cancel_appointment_":
 		appointmentID := data[19:]
 		h.clientHandler.HandleCancelAppointment(chatID, appointmentID)
