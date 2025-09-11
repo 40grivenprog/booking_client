@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"booking_client/internal/config"
+	"booking_client/internal/handlers/client"
+	"booking_client/internal/handlers/common"
+	"booking_client/internal/handlers/professional"
 	"booking_client/internal/models"
 	"booking_client/internal/services"
 	"booking_client/pkg/telegram"
@@ -16,8 +19,8 @@ type Handler struct {
 	config              *config.Config
 	logger              *zerolog.Logger
 	apiService          *services.APIService
-	clientHandler       *ClientHandler
-	professionalHandler *ProfessionalHandler
+	clientHandler       *client.ClientHandler
+	professionalHandler *professional.ProfessionalHandler
 }
 
 // NewHandler creates a new handler instance
@@ -29,8 +32,8 @@ func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger
 		config:              config,
 		logger:              logger,
 		apiService:          apiService,
-		clientHandler:       NewClientHandler(bot, logger, apiService),
-		professionalHandler: NewProfessionalHandler(bot, logger, apiService),
+		clientHandler:       client.NewClientHandler(bot, logger, apiService),
+		professionalHandler: professional.NewProfessionalHandler(bot, logger, apiService),
 	}
 }
 
@@ -108,16 +111,16 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		h.professionalHandler.HandleTimetable(chatID)
 	case len(data) >= 19 && data[:19] == "prev_timetable_day_":
 		date := data[19:]
-		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, DirectionPrev)
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionPrev)
 	case len(data) >= 19 && data[:19] == "next_timetable_day_":
 		date := data[19:]
-		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, DirectionNext)
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionNext)
 	case len(data) >= 20 && data[:20] == "prev_upcoming_month_":
 		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, DirectionPrev)
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
 	case len(data) >= 20 && data[:20] == "next_upcoming_month_":
 		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, DirectionNext)
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
 	case len(data) >= 21 && data[:21] == "select_upcoming_date_":
 		date := data[21:]
 		h.professionalHandler.HandleUpcomingAppointmentsDateSelection(chatID, date)
@@ -175,7 +178,7 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		if user.Role == "professional" {
 			h.professionalHandler.ShowDashboard(chatID, user)
 		} else {
-			h.clientHandler.ShowDashboard(chatID, user)
+			h.clientHandler.ShowDashboard(chatID)
 		}
 	default:
 		h.sendUnknownCommand(chatID)
@@ -191,7 +194,7 @@ func (h *Handler) handleStart(chatID int64, userID int) {
 		if user.Role == "professional" {
 			h.professionalHandler.ShowDashboard(chatID, user)
 		} else {
-			h.clientHandler.ShowDashboard(chatID, user)
+			h.clientHandler.ShowDashboard(chatID)
 		}
 		return
 	}

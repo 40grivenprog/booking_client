@@ -1,4 +1,4 @@
-package handlers
+package common
 
 import (
 	"fmt"
@@ -29,12 +29,12 @@ func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 
 // NotifyProfessionalNewAppointment sends notification to professional about new appointment
 func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *models.CreateAppointmentResponse) {
-	currentUser, ok := getUserOrSendError(ns.apiService.GetUserRepository(), ns.bot, ns.logger, appointment.Professional.ChatID)
+	currentUser, ok := GetUserOrSendError(ns.apiService.GetUserRepository(), ns.bot, ns.logger, appointment.Professional.ChatID)
 	if !ok {
 		return
 	}
 
-	date, startTime, endTime := formatAppointmentTime(appointment.Appointment.StartTime, appointment.Appointment.EndTime)
+	date, startTime, endTime := FormatAppointmentTime(appointment.Appointment.StartTime, appointment.Appointment.EndTime)
 
 	text := fmt.Sprintf(UIMsgNewAppointmentRequest,
 		appointment.Client.FirstName, appointment.Client.LastName,
@@ -52,7 +52,7 @@ func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *mod
 	if err != nil {
 		ns.logger.Error().Err(err).Msg("Failed to send professional notification")
 	}
-	
+
 	currentUser.LastMessageID = &id
 	ns.apiService.GetUserRepository().SetUser(appointment.Professional.ChatID, currentUser)
 }
@@ -63,7 +63,7 @@ func (ns *NotificationService) NotifyProfessionalCancellation(response *models.C
 		return // No chat ID for professional
 	}
 
-	date, startTime, endTime := formatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
+	date, startTime, endTime := FormatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
 
 	text := fmt.Sprintf(UIMsgAppointmentCancelled,
 		response.Client.FirstName, response.Client.LastName,
@@ -81,7 +81,7 @@ func (ns *NotificationService) NotifyClientAppointmentConfirmation(response *mod
 		return // No chat ID for client
 	}
 
-	date, startTime, endTime := formatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
+	date, startTime, endTime := FormatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
 
 	text := fmt.Sprintf(UIMsgAppointmentConfirmed,
 		date, startTime, endTime,
@@ -98,7 +98,7 @@ func (ns *NotificationService) NotifyClientProfessionalCancellation(response *mo
 		return // No chat ID for client
 	}
 
-	date, startTime, endTime := formatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
+	date, startTime, endTime := FormatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
 
 	text := fmt.Sprintf(UIMsgAppointmentCancelledByProfessional,
 		date, startTime, endTime,
