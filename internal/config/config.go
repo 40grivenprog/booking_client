@@ -10,6 +10,7 @@ import (
 type Config struct {
 	TelegramToken string
 	APIBaseURL    string
+	JWTSecret     string
 	Debug         bool
 	Port          int
 }
@@ -28,6 +29,12 @@ func Load() (*Config, error) {
 	config.APIBaseURL = os.Getenv("API_BASE_URL")
 	if config.APIBaseURL == "" {
 		config.APIBaseURL = "http://localhost:8080" // Default API URL
+	}
+
+	// JWT Secret (must match booking_api secret)
+	config.JWTSecret = os.Getenv("JWT_SECRET")
+	if config.JWTSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET environment variable is required")
 	}
 
 	// Debug mode

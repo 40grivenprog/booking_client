@@ -50,7 +50,10 @@ func main() {
 	}
 
 	// Initialize handlers
-	handler := handlers.NewHandler(bot, cfg, &logger)
+	handler, err := handlers.NewHandler(bot, cfg, &logger)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize handlers")
+	}
 
 	// Register command handlers
 	handler.RegisterHandlers()

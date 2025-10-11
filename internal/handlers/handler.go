@@ -24,8 +24,11 @@ type Handler struct {
 }
 
 // NewHandler creates a new handler instance
-func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger) *Handler {
-	apiService := services.NewAPIService(config, logger)
+func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger) (*Handler, error) {
+	apiService, err := services.NewAPIService(config, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Handler{
 		bot:                 bot,
@@ -34,7 +37,7 @@ func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger
 		apiService:          apiService,
 		clientHandler:       client.NewClientHandler(bot, logger, apiService),
 		professionalHandler: professional.NewProfessionalHandler(bot, logger, apiService),
-	}
+	}, nil
 }
 
 // RegisterHandlers registers all command handlers

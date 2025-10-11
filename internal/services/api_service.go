@@ -12,6 +12,7 @@ import (
 	"booking_client/internal/models"
 	"booking_client/internal/repository"
 	"booking_client/internal/schema"
+	"booking_client/internal/token"
 
 	"github.com/rs/zerolog"
 )
@@ -22,10 +23,26 @@ type APIService struct {
 	client         *http.Client
 	logger         *zerolog.Logger
 	userRepository *repository.UserRepository
+	tokenMaker     token.Maker
+	authToken      string
 }
 
 // NewAPIService creates a new API service
-func NewAPIService(config *config.Config, logger *zerolog.Logger) *APIService {
+func NewAPIService(config *config.Config, logger *zerolog.Logger) (*APIService, error) {
+	// Create token maker
+	tokenMaker, err := token.NewJWTMaker(config.JWTSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token maker: %w", err)
+	}
+
+	// Generate token (valid for 24 hours)
+	authToken, err := tokenMaker.CreateToken("booking_client", 24*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth token: %w", err)
+	}
+
+	logger.Info().Msg("JWT token generated successfully")
+
 	return &APIService{
 		baseURL: config.APIBaseURL,
 		client: &http.Client{
@@ -33,7 +50,14 @@ func NewAPIService(config *config.Config, logger *zerolog.Logger) *APIService {
 		},
 		logger:         logger,
 		userRepository: repository.NewUserRepository(),
-	}
+		tokenMaker:     tokenMaker,
+		authToken:      authToken,
+	}, nil
+}
+
+// addAuthHeader adds the JWT authorization header to the request
+func (s *APIService) addAuthHeader(req *http.Request) {
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.authToken))
 }
 
 // GetUserByChatID retrieves a user by their chat ID (checks local storage first, then API)
@@ -62,7 +86,13 @@ func (s *APIService) GetUserByChatID(chatID int64) (*models.User, error) {
 func (s *APIService) fetchUserFromAPI(chatID int64) (*models.User, error) {
 	url := fmt.Sprintf("%s/api/users/%d", s.baseURL, chatID)
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -101,7 +131,14 @@ func (s *APIService) RegisterClient(req *schema.RegisterRequest) (*models.Client
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
+
+	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -136,7 +173,14 @@ func (s *APIService) RegisterProfessional(req *schema.RegisterRequest) (*models.
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
+
+	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -176,7 +220,14 @@ func (s *APIService) SignInProfessional(req *schema.ProfessionalSignInRequest) (
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
+
+	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -211,7 +262,13 @@ func (s *APIService) SignInProfessional(req *schema.ProfessionalSignInRequest) (
 func (s *APIService) GetProfessionals() (*models.GetProfessionalsResponse, error) {
 	url := fmt.Sprintf("%s/api/professionals", s.baseURL)
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -238,7 +295,13 @@ func (s *APIService) GetProfessionals() (*models.GetProfessionalsResponse, error
 func (s *APIService) GetProfessionalAvailability(professionalID, date string) (*models.ProfessionalAvailabilityResponse, error) {
 	url := fmt.Sprintf("%s/api/professionals/%s/availability?date=%s", s.baseURL, professionalID, date)
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -270,7 +333,14 @@ func (s *APIService) CreateAppointment(req *schema.CreateAppointmentRequest) (*m
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
+
+	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -311,7 +381,13 @@ func (s *APIService) GetClientAppointments(clientID, status string) (*models.Get
 		url += "?status=" + status
 	}
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -348,6 +424,7 @@ func (s *APIService) CancelClientAppointment(clientID, appointmentID string, req
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
@@ -380,7 +457,13 @@ func (s *APIService) GetProfessionalAppointments(professionalID, status string) 
 		url += "?status=" + status
 	}
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -414,6 +497,7 @@ func (s *APIService) GetProfessionalAppointmentDates(professionalID, month strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	s.addAuthHeader(httpReq)
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
@@ -453,6 +537,7 @@ func (s *APIService) ConfirmProfessionalAppointment(professionalID, appointmentI
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
@@ -492,6 +577,7 @@ func (s *APIService) CancelProfessionalAppointment(professionalID, appointmentID
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
@@ -531,6 +617,7 @@ func (s *APIService) CreateUnavailableAppointment(req *schema.CreateUnavailableA
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	s.addAuthHeader(httpReq)
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
@@ -560,7 +647,13 @@ func (s *APIService) CreateUnavailableAppointment(req *schema.CreateUnavailableA
 func (s *APIService) GetProfessionalAppointmentsByDate(professionalID, status, date string) (*models.GetProfessionalAppointmentsResponse, error) {
 	url := fmt.Sprintf("%s/api/professionals/%s/appointments?status=%s&date=%s", s.baseURL, professionalID, status, date)
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -588,7 +681,13 @@ func (s *APIService) GetProfessionalAppointmentsByDate(professionalID, status, d
 func (s *APIService) GetProfessionalTimetable(professionalID, date string) (*models.GetProfessionalTimetableResponse, error) {
 	url := fmt.Sprintf("%s/api/professionals/%s/timetable?date=%s", s.baseURL, professionalID, date)
 
-	resp, err := s.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	s.addAuthHeader(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get timetable: %w", err)
 	}
