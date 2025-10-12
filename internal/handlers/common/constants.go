@@ -87,7 +87,7 @@ const (
 	UIMsgUnavailableDescription             = "📝 Please provide a description for your unavailable period:\n\n📅 Date: %s\n🕐 Time: %s - %s\n\nExample: \"Personal break\", \"Lunch time\", \"Out of office\", etc."
 	UIMsgUnavailableSlotWarning             = "⚠️ You can only select times before %s (%s)"
 	UIMsgNoAvailableTimeSlots               = "❌ No available time slots before your next unavailable period."
-	UIMsgSelectUpcomingAppointmentsDate     = "📅 Here are the dates with upcoming appointments for the selected month. Select a date to view upcoming appointments:"
+	UIMsgSelectUpcomingAppointmentsDate     = "📅 Here are the dates with upcoming appointments for the selected month(%s). Select a date to view upcoming appointments:"
 	UIMsgTimetableEmpty                     = "📋 No activities scheduled for this day(%s)."
 	UIMsgTimetableHeader                    = "📋 Your Timetable for %s:\n\n"
 	UIMsgTimetableSlot                      = "📅 Slot #%d:\n🕐 %s - %s\n📝 %s\n\n"

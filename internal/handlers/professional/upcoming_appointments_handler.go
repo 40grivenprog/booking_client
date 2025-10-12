@@ -3,6 +3,7 @@ package professional
 import (
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
+	"fmt"
 	"time"
 )
 
@@ -31,14 +32,7 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, u
 		return
 	}
 
-	// If no dates available, show message
-	if len(appointmentDates.Dates) == 0 {
-		h.sendMessage(chatID, common.UIMsgNoUpcomingAppointmentsForMonth)
-		h.ShowDashboard(chatID, user)
-		return
-	}
-
-	text := common.UIMsgSelectUpcomingAppointmentsDate
+	text := fmt.Sprintf(common.UIMsgSelectUpcomingAppointmentsDate, targetMonth)
 	keyboard := h.createUpcomingAppointmentsDateKeyboard(appointmentDates.Dates, targetMonth)
 	h.sendMessageWithKeyboard(chatID, text, keyboard)
 }
