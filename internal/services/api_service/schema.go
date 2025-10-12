@@ -1,4 +1,4 @@
-package schema
+package api_service
 
 // RegisterRequest represents a user registration request
 type RegisterRequest struct {

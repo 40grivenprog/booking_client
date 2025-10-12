@@ -1,0 +1,247 @@
+package professional
+
+import (
+	"booking_client/internal/handlers/common"
+	"booking_client/internal/models"
+	apiService "booking_client/internal/services/api_service"
+	"booking_client/internal/util"
+	"fmt"
+	"time"
+)
+
+// HandleSetUnavailable starts the unavailable appointment setting process
+func (h *ProfessionalHandler) HandleSetUnavailable(chatID int64) {
+	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Set state for unavailable appointment
+	user.State = models.StateWaitingForUnavailableDateSelection
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	// Show current month dates
+	h.showUnavailableDateSelection(chatID, time.Now())
+}
+
+// showUnavailableDateSelection shows available dates for the current month
+func (h *ProfessionalHandler) showUnavailableDateSelection(chatID int64, currentDate time.Time) {
+	text := fmt.Sprintf(common.UIMsgSelectUnavailableDate, currentDate.Month(), currentDate.Year())
+	keyboard := h.createUnavailableDateKeyboard(currentDate)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableDateSelection handles when user selects a date for unavailable time
+func (h *ProfessionalHandler) HandleUnavailableDateSelection(chatID int64, date string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
+	}
+
+	user.State = models.StateWaitingForUnavailableStartTime
+	user.SelectedDate = date
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	// Get availability for selected date to show time slots
+	availability, err := h.apiService.GetProfessionalAvailability(user.ID, date)
+	if err != nil {
+		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		return
+	}
+
+	h.showUnavailableStartTimeSelection(chatID, availability)
+}
+
+// showUnavailableStartTimeSelection shows available time slots for start time
+func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, availability *models.ProfessionalAvailabilityResponse) {
+	text := fmt.Sprintf(common.UIMsgSelectUnavailableStartTime, availability.Date)
+	keyboard := h.createUnavailableStartTimeKeyboard(availability)
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableStartTimeSelection handles when user selects start time for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(chatID int64, startTime string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableStartTime,
+	})
+	if !valid {
+		return
+	}
+
+	user.State = models.StateWaitingForUnavailableEndTime
+	user.SelectedUnavailableStartTime = startTime // Store start time temporarily
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	// Get availability for the selected date to determine available end times
+	availability, err := h.apiService.GetProfessionalAvailability(user.ID, user.SelectedDate)
+	if err != nil {
+		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		return
+	}
+
+	h.showUnavailableEndTimeSelection(chatID, startTime, availability)
+}
+
+// showUnavailableEndTimeSelection shows available time slots for end time
+func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, availability *models.ProfessionalAvailabilityResponse) {
+	text := fmt.Sprintf(common.UIMsgSelectUnavailableEndTime, startTime)
+
+	// Find the first unavailable slot after the selected start time to show warning
+	var firstUnavailableSlot *models.TimeSlot
+
+	for _, slot := range availability.Slots {
+		slotStart, err := time.Parse(time.RFC3339, slot.StartTime)
+		if err != nil {
+			continue
+		}
+		slotStartLocal := slotStart.In(util.GetAppTimezone())
+		slotTimeStr := slotStartLocal.Format("15:04")
+
+		// Only consider slots that are after the selected start time
+		if !slot.Available && slotTimeStr > startTime {
+			firstUnavailableSlot = &slot
+			break
+		}
+	}
+
+	if firstUnavailableSlot != nil {
+		unavailableStart, _ := time.Parse(time.RFC3339, firstUnavailableSlot.StartTime)
+		unavailableStartLocal := unavailableStart.In(util.GetAppTimezone())
+
+		// Build slot details with enhanced information
+		slotDetails := fmt.Sprintf("Unavailable slot at %s", unavailableStartLocal.Format("15:04"))
+		if firstUnavailableSlot.Type != "" {
+			slotDetails += fmt.Sprintf(" (%s)", firstUnavailableSlot.Type)
+		}
+		if firstUnavailableSlot.Description != "" {
+			slotDetails += fmt.Sprintf(" - %s", firstUnavailableSlot.Description)
+		}
+
+		text += fmt.Sprintf("\n\n"+common.UIMsgUnavailableSlotWarning, unavailableStartLocal.Format("15:04"), slotDetails)
+	}
+
+	keyboard := h.createUnavailableEndTimeKeyboard(startTime, availability)
+
+	// If no slots available, show a message
+	if len(keyboard.InlineKeyboard) == 1 && len(keyboard.InlineKeyboard[0]) == 1 && keyboard.InlineKeyboard[0][0].Text == "❌ Cancel" {
+		text += "\n\n" + common.UIMsgNoAvailableTimeSlots
+	}
+
+	h.sendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+// HandleUnavailableEndTimeSelection handles when user selects end time for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(chatID int64, endTime string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableEndTime,
+	})
+	if !valid {
+		return
+	}
+
+	// Store end time and ask for description
+	user.State = models.StateWaitingForUnavailableDescription
+	user.SelectedUnavailableEndTime = endTime
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	text := fmt.Sprintf(common.UIMsgUnavailableDescription, user.SelectedDate, user.SelectedUnavailableStartTime, endTime)
+	h.sendMessage(chatID, text)
+}
+
+// HandleUnavailableDescription handles when user provides description for unavailable period
+func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, description string) {
+	user, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDescription,
+	})
+	if !valid {
+		return
+	}
+
+	// Create unavailable appointment
+	start, _ := time.Parse("15:04", user.SelectedUnavailableStartTime)
+	end, _ := time.Parse("15:04", user.SelectedUnavailableEndTime)
+	date := user.SelectedDate
+
+	// Parse the date and combine with times
+	selectedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		h.sendMessage(chatID, common.ErrorMsgInvalidDateFormat)
+		return
+	}
+
+	// Combine date with times in application timezone
+	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+		start.Hour(), start.Minute(), 0, 0, util.GetAppTimezone())
+	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+		end.Hour(), end.Minute(), 0, 0, util.GetAppTimezone())
+
+	// Create unavailable appointment request
+	req := &apiService.CreateUnavailableAppointmentRequest{
+		ProfessionalID: user.ID,
+		StartAt:        startDateTime.Format(time.RFC3339),
+		EndAt:          endDateTime.Format(time.RFC3339),
+		Description:    description,
+	}
+
+	appointment, err := h.apiService.CreateUnavailableAppointment(req)
+	if err != nil {
+		h.sendError(chatID, common.ErrorMsgFailedToCreateUnavailableAppointment, err)
+		return
+	}
+	// Clear state
+	h.clearUnavailableState(user)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	text := fmt.Sprintf(common.SuccessMsgUnavailablePeriodSet,
+		date, start.Format("15:04"), end.Format("15:04"), appointment.Appointment.Description)
+
+	h.sendMessage(chatID, text)
+	h.ShowDashboard(chatID, user)
+}
+
+// HandleCancelUnavailable cancels the unavailable appointment setting process
+func (h *ProfessionalHandler) HandleCancelUnavailable(chatID int64) {
+	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	if !ok {
+		return
+	}
+
+	// Clear all unavailable-related state
+	h.clearUnavailableState(user)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
+
+	h.sendMessage(chatID, common.ErrorMsgUnavailableCancelled)
+	h.ShowDashboard(chatID, user)
+}
+
+// HandlePrevUnavailableMonth handles previous month navigation for unavailable appointments
+func (h *ProfessionalHandler) HandlePrevUnavailableMonth(chatID int64) {
+	// Validate user state - only allow if waiting for unavailable date selection
+	_, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
+	}
+
+	// For simplicity, we'll just show current month again
+	// In a real implementation, you'd store the current month in user state
+	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, -1, 0))
+}
+
+// HandleNextUnavailableMonth handles next month navigation for unavailable appointments
+func (h *ProfessionalHandler) HandleNextUnavailableMonth(chatID int64) {
+	// Validate user state - only allow if waiting for unavailable date selection
+	_, valid := h.validateUserState(chatID, []string{
+		models.StateWaitingForUnavailableDateSelection,
+	})
+	if !valid {
+		return
+	}
+
+	// For simplicity, we'll just show current month again
+	// In a real implementation, you'd store the current month in user state
+	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, 1, 0))
+}

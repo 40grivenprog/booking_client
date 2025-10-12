@@ -3,7 +3,7 @@ package client
 import (
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
-	"booking_client/internal/schema"
+	apiService "booking_client/internal/services/api_service"
 	"fmt"
 )
 
@@ -37,7 +37,7 @@ func (h *ClientHandler) HandleCancellationReason(chatID int64, reason string) {
 	appointmentID := user.SelectedAppointmentID
 
 	// Cancel the appointment
-	req := &schema.CancelAppointmentRequest{
+	req := &apiService.CancelAppointmentRequest{
 		CancellationReason: reason,
 	}
 

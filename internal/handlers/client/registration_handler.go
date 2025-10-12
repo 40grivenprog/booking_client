@@ -3,8 +3,7 @@ package client
 import (
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
-	"booking_client/internal/schema"
-	"fmt"
+	apiService "booking_client/internal/services/api_service"
 )
 
 // StartRegistration starts the client registration process
@@ -80,7 +79,7 @@ func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
 	}
 
 	// Register the client
-	req := &schema.RegisterRequest{
+	req := &apiService.RegisterRequest{
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
 		ChatID:      chatID,
@@ -105,7 +104,13 @@ func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
 	user.State = models.StateNone
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := fmt.Sprintf(common.SuccessMsgRegistrationSuccessful, response.FirstName, response.LastName, response.Role, chatID)
+	// Build success message
+	text := common.NewSuccessMessage("registration_success").
+		WithData("first_name", response.FirstName).
+		WithData("last_name", response.LastName).
+		WithData("role", response.Role).
+		Build()
+
 	keyboard := h.createRegistrationSuccessKeyboard()
 
 	id, err := h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)

@@ -1,8 +1,6 @@
 package common
 
 import (
-	"fmt"
-
 	"booking_client/internal/models"
 	"booking_client/internal/repository"
 	"booking_client/pkg/telegram"
@@ -18,16 +16,13 @@ func FormatAppointmentTime(startTime, endTime string) (string, string, string) {
 	return start, startTimeOnly, endTimeOnly
 }
 
-// formatAppointmentDetails formats appointment details for display
+// FormatAppointmentDetails formats appointment details for client display
+// Deprecated: Use NewClientAppointmentMessage(apt, index).ForClient() instead
 func FormatAppointmentDetails(apt *models.ClientAppointment, index int) string {
-	date, startTime, endTime := FormatAppointmentTime(apt.StartTime, apt.EndTime)
-	return fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👨‍💼 %s %s\n📝 %s\n\n",
-		index+1, date, startTime, endTime,
-		apt.Professional.FirstName, apt.Professional.LastName,
-		apt.Description)
+	return NewClientAppointmentMessage(apt, index).ForClient()
 }
 
-// getUserOrSendError retrieves user from repository or sends error message
+// GetUserOrSendError retrieves user from repository or sends error message
 func GetUserOrSendError(userRepo *repository.UserRepository, bot *telegram.Bot, logger *zerolog.Logger, chatID int64) (*models.User, bool) {
 	user, exists := userRepo.GetUser(chatID)
 	if !exists || user == nil {
@@ -40,11 +35,8 @@ func GetUserOrSendError(userRepo *repository.UserRepository, bot *telegram.Bot, 
 	return user, true
 }
 
-// formatProfessionalAppointmentDetails formats appointment details for professional display
+// FormatProfessionalAppointmentDetails formats appointment details for professional display
+// Deprecated: Use NewProfessionalAppointmentMessage(apt, index).ForProfessional() instead
 func FormatProfessionalAppointmentDetails(apt *models.ProfessionalAppointment, index int) string {
-	date, startTime, endTime := FormatAppointmentTime(apt.StartTime, apt.EndTime)
-	return fmt.Sprintf("✍️ Appointment #%d:\n📅 %s\n🕐 %s - %s\n👤 Client: %s %s\n📝 %s\n\n",
-		index+1, date, startTime, endTime,
-		apt.Client.FirstName, apt.Client.LastName,
-		apt.Description)
+	return NewProfessionalAppointmentMessage(apt, index).ForProfessional()
 }

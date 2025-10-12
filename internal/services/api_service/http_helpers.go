@@ -1,0 +1,111 @@
+package api_service
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+// makeRequest performs an HTTP request with auth header and returns the response body
+func (s *APIService) makeRequest(method, url string, body interface{}, expectedStatus int) ([]byte, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonData, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonData)
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if err := s.addAuthHeader(req); err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != expectedStatus {
+		return nil, s.parseAPIError(resp.StatusCode, respBody)
+	}
+
+	return respBody, nil
+}
+
+// parseAPIError attempts to parse an API error response
+func (s *APIService) parseAPIError(statusCode int, body []byte) error {
+	var errorResp ErrorResponse
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		// If we can't parse the error response, return the raw body
+		return fmt.Errorf("API returned status %d: %s", statusCode, strings.TrimSpace(string(body)))
+	}
+
+	// Return structured error
+	return &APIError{
+		StatusCode: statusCode,
+		ErrorType:  errorResp.Error,
+		Message:    errorResp.Message,
+		RequestID:  errorResp.RequestID,
+	}
+}
+
+// makeGetRequest performs a GET request and unmarshals the response
+func (s *APIService) makeGetRequest(url string, result interface{}) error {
+	body, err := s.makeRequest(http.MethodGet, url, nil, http.StatusOK)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// makePostRequest performs a POST request and unmarshals the response
+func (s *APIService) makePostRequest(url string, reqBody interface{}, result interface{}) error {
+	body, err := s.makeRequest(http.MethodPost, url, reqBody, http.StatusCreated)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// makePatchRequest performs a PATCH request and unmarshals the response
+func (s *APIService) makePatchRequest(url string, reqBody interface{}, result interface{}) error {
+	body, err := s.makeRequest(http.MethodPatch, url, reqBody, http.StatusOK)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}

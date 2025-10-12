@@ -5,8 +5,9 @@ import (
 	"booking_client/internal/handlers/client"
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/handlers/professional"
+	"booking_client/internal/handlers/router"
 	"booking_client/internal/models"
-	"booking_client/internal/services"
+	apiService "booking_client/internal/services/api_service"
 	"booking_client/pkg/telegram"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -18,26 +19,39 @@ type Handler struct {
 	bot                 *telegram.Bot
 	config              *config.Config
 	logger              *zerolog.Logger
-	apiService          *services.APIService
+	apiService          *apiService.APIService
 	clientHandler       *client.ClientHandler
 	professionalHandler *professional.ProfessionalHandler
+	callbackRouter      *router.CallbackRouter
 }
 
 // NewHandler creates a new handler instance
 func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger) (*Handler, error) {
-	apiService, err := services.NewAPIService(config, logger)
+	apiService, err := apiService.NewAPIService(config, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Handler{
+	h := &Handler{
 		bot:                 bot,
 		config:              config,
 		logger:              logger,
 		apiService:          apiService,
 		clientHandler:       client.NewClientHandler(bot, logger, apiService),
 		professionalHandler: professional.NewProfessionalHandler(bot, logger, apiService),
-	}, nil
+		callbackRouter:      router.NewCallbackRouter(logger),
+	}
+
+	// Setup callback routes
+	h.setupRoutes()
+
+	exactCount, prefixCount := h.callbackRouter.GetStats()
+	logger.Info().
+		Int("exact_handlers", exactCount).
+		Int("prefix_handlers", prefixCount).
+		Msg("Callback router initialized")
+
+	return h, nil
 }
 
 // RegisterHandlers registers all command handlers
@@ -78,6 +92,134 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 	}
 }
 
+// setupRoutes registers all callback handlers with the router
+func (h *Handler) setupRoutes() {
+	// Initial selection
+	h.callbackRouter.RegisterExact(common.CallbackClient, func(chatID int64, _ string) {
+		h.clientHandler.StartRegistration(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackProfessional, func(chatID int64, _ string) {
+		h.professionalHandler.StartSignIn(chatID)
+	})
+
+	// Client callbacks
+	h.callbackRouter.RegisterExact(common.CallbackBookAppointment, func(chatID int64, _ string) {
+		h.clientHandler.HandleBookAppointment(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackPendingAppointments, func(chatID int64, _ string) {
+		h.clientHandler.HandlePendingAppointments(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackUpcomingAppointments, func(chatID int64, _ string) {
+		h.clientHandler.HandleUpcomingAppointments(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackCancelBooking, func(chatID int64, _ string) {
+		h.clientHandler.HandleCancelBooking(chatID)
+	})
+
+	// Professional callbacks
+	h.callbackRouter.RegisterExact(common.CallbackProfessionalPendingAppointments, func(chatID int64, _ string) {
+		h.professionalHandler.HandlePendingAppointments(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackProfessionalUpcomingAppointments, func(chatID int64, _ string) {
+		h.professionalHandler.HandleUpcomingAppointments(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackProfessionalTimetable, func(chatID int64, _ string) {
+		h.professionalHandler.HandleTimetable(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackSetUnavailable, func(chatID int64, _ string) {
+		h.professionalHandler.HandleSetUnavailable(chatID)
+	})
+
+	// Unavailable navigation
+	h.callbackRouter.RegisterExact(common.CallbackPrevUnavailableMonth, func(chatID int64, _ string) {
+		h.professionalHandler.HandlePrevUnavailableMonth(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackNextUnavailableMonth, func(chatID int64, _ string) {
+		h.professionalHandler.HandleNextUnavailableMonth(chatID)
+	})
+	h.callbackRouter.RegisterExact(common.CallbackCancelUnavailable, func(chatID int64, _ string) {
+		h.professionalHandler.HandleCancelUnavailable(chatID)
+	})
+
+	// Professional timetable navigation
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixPrevTimetableDay, func(chatID int64, date string) {
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionPrev)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixNextTimetableDay, func(chatID int64, date string) {
+		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionNext)
+	})
+
+	// Professional upcoming appointments navigation
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixPrevUpcomingMonth, func(chatID int64, month string) {
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixNextUpcomingMonth, func(chatID int64, month string) {
+		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectUpcomingDate, func(chatID int64, date string) {
+		h.professionalHandler.HandleUpcomingAppointmentsDateSelection(chatID, date)
+	})
+
+	// Client booking flow - month navigation
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixPrevMonth, func(chatID int64, month string) {
+		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixNextMonth, func(chatID int64, month string) {
+		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
+	})
+
+	// Selection callbacks
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectProfessional, func(chatID int64, professionalID string) {
+		h.clientHandler.HandleProfessionalSelection(chatID, professionalID)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectDate, func(chatID int64, date string) {
+		h.clientHandler.HandleDateSelection(chatID, date)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectTime, func(chatID int64, startTime string) {
+		h.clientHandler.HandleTimeSelection(chatID, startTime)
+	})
+
+	// Appointment actions
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixCancelAppointment, func(chatID int64, appointmentID string) {
+		h.clientHandler.HandleCancelAppointment(chatID, appointmentID)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixConfirmAppointment, func(chatID int64, appointmentID string) {
+		h.professionalHandler.HandleConfirmAppointment(chatID, appointmentID)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixCancelProfAppt, func(chatID int64, appointmentID string) {
+		h.professionalHandler.HandleCancelAppointment(chatID, appointmentID)
+	})
+
+	// Unavailable flow
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectUnavailableDate, func(chatID int64, date string) {
+		h.professionalHandler.HandleUnavailableDateSelection(chatID, date)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectUnavailableStart, func(chatID int64, startTime string) {
+		h.professionalHandler.HandleUnavailableStartTimeSelection(chatID, startTime)
+	})
+	h.callbackRouter.RegisterPrefix(common.CallbackPrefixSelectUnavailableEnd, func(chatID int64, endTime string) {
+		h.professionalHandler.HandleUnavailableEndTimeSelection(chatID, endTime)
+	})
+
+	// Back to dashboard (special case - needs user lookup)
+	h.callbackRouter.RegisterExact(common.CallbackBackToDashboard, func(chatID int64, _ string) {
+		user, exists := h.apiService.GetUserRepository().GetUser(chatID)
+		if !exists || user == nil {
+			text := "❌ User session not found. Please use /start to begin."
+			if err := h.bot.SendMessage(chatID, text); err != nil {
+				h.logger.Error().Err(err).Msg("Failed to send user not found message")
+			}
+			return
+		}
+		// Show appropriate dashboard based on user role
+		if user.Role == "professional" {
+			h.professionalHandler.ShowDashboard(chatID, user)
+		} else {
+			h.clientHandler.ShowDashboard(chatID)
+		}
+	})
+}
+
 // handleCallbackQuery handles inline keyboard button presses
 func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 	chatID := callback.Message.Chat.ID
@@ -94,98 +236,9 @@ func (h *Handler) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 		h.logger.Error().Err(err).Msg("Failed to answer callback query")
 	}
 
-	// Handle the callback data
-	switch {
-	case data == "client":
-		h.clientHandler.StartRegistration(chatID)
-	case data == "professional":
-		h.professionalHandler.StartSignIn(chatID)
-	case data == "book_appointment":
-		h.clientHandler.HandleBookAppointment(chatID)
-	case data == "pending_appointments":
-		h.clientHandler.HandlePendingAppointments(chatID)
-	case data == "upcoming_appointments":
-		h.clientHandler.HandleUpcomingAppointments(chatID)
-	case data == "professional_pending_appointments":
-		h.professionalHandler.HandlePendingAppointments(chatID)
-	case data == "professional_upcoming_appointments":
-		h.professionalHandler.HandleUpcomingAppointments(chatID)
-	case data == "professional_timetable":
-		h.professionalHandler.HandleTimetable(chatID)
-	case len(data) >= 19 && data[:19] == "prev_timetable_day_":
-		date := data[19:]
-		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionPrev)
-	case len(data) >= 19 && data[:19] == "next_timetable_day_":
-		date := data[19:]
-		h.professionalHandler.HandleTimetableDateNavigation(chatID, date, common.DirectionNext)
-	case len(data) >= 20 && data[:20] == "prev_upcoming_month_":
-		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
-	case len(data) >= 20 && data[:20] == "next_upcoming_month_":
-		month := data[20:]
-		h.professionalHandler.HandleUpcomingAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
-	case len(data) >= 21 && data[:21] == "select_upcoming_date_":
-		date := data[21:]
-		h.professionalHandler.HandleUpcomingAppointmentsDateSelection(chatID, date)
-	case data == "set_unavailable":
-		h.professionalHandler.HandleSetUnavailable(chatID)
-	case data == "cancel_booking":
-		h.clientHandler.HandleCancelBooking(chatID)
-	case len(data) > 20 && data[:20] == "select_professional_":
-		professionalID := data[20:]
-		h.clientHandler.HandleProfessionalSelection(chatID, professionalID)
-	case len(data) > 12 && data[:12] == "select_date_":
-		date := data[12:]
-		h.clientHandler.HandleDateSelection(chatID, date)
-	case len(data) > 12 && data[:12] == "select_time_":
-		startTime := data[12:]
-		h.clientHandler.HandleTimeSelection(chatID, startTime)
-	case len(data) > 11 && data[:11] == "prev_month_":
-		month := data[11:]
-		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionPrev)
-	case len(data) > 11 && data[:11] == "next_month_":
-		month := data[11:]
-		h.clientHandler.HandleBookAppointmentsMonthNavigation(chatID, month, common.DirectionNext)
-	case len(data) > 19 && data[:19] == "cancel_appointment_":
-		appointmentID := data[19:]
-		h.clientHandler.HandleCancelAppointment(chatID, appointmentID)
-	case len(data) > 20 && data[:20] == "confirm_appointment_":
-		appointmentID := data[20:]
-		h.professionalHandler.HandleConfirmAppointment(chatID, appointmentID)
-	case len(data) > 20 && data[:17] == "cancel_prof_appt_":
-		appointmentID := data[17:]
-		h.professionalHandler.HandleCancelAppointment(chatID, appointmentID)
-	case len(data) >= 24 && data[:24] == "select_unavailable_date_":
-		date := data[24:]
-		h.professionalHandler.HandleUnavailableDateSelection(chatID, date)
-	case len(data) >= 25 && data[:25] == "select_unavailable_start_":
-		startTime := data[25:]
-		h.professionalHandler.HandleUnavailableStartTimeSelection(chatID, startTime)
-	case len(data) >= 23 && data[:23] == "select_unavailable_end_":
-		endTime := data[23:]
-		h.professionalHandler.HandleUnavailableEndTimeSelection(chatID, endTime)
-	case data == "prev_unavailable_month":
-		h.professionalHandler.HandlePrevUnavailableMonth(chatID)
-	case data == "next_unavailable_month":
-		h.professionalHandler.HandleNextUnavailableMonth(chatID)
-	case data == "cancel_unavailable":
-		h.professionalHandler.HandleCancelUnavailable(chatID)
-	case data == "back_to_dashboard":
-		user, exists := h.apiService.GetUserRepository().GetUser(chatID)
-		if !exists || user == nil {
-			text := "❌ User session not found. Please use /start to begin."
-			if err := h.bot.SendMessage(chatID, text); err != nil {
-				h.logger.Error().Err(err).Msg("Failed to send user not found message")
-			}
-			return
-		}
-		// Show appropriate dashboard based on user role
-		if user.Role == "professional" {
-			h.professionalHandler.ShowDashboard(chatID, user)
-		} else {
-			h.clientHandler.ShowDashboard(chatID)
-		}
-	default:
+	// Route the callback to the appropriate handler
+	if !h.callbackRouter.Route(chatID, data) {
+		// No handler found - send unknown command message
 		h.sendUnknownCommand(chatID)
 	}
 }

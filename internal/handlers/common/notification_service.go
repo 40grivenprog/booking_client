@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"booking_client/internal/models"
-	"booking_client/internal/services"
+	apiService "booking_client/internal/services/api_service"
 	"booking_client/pkg/telegram"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -15,11 +15,11 @@ import (
 type NotificationService struct {
 	bot        *telegram.Bot
 	logger     *zerolog.Logger
-	apiService *services.APIService
+	apiService *apiService.APIService
 }
 
 // NewNotificationService creates a new notification service
-func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger, apiService *services.APIService) *NotificationService {
+func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger, apiService *apiService.APIService) *NotificationService {
 	return &NotificationService{
 		bot:        bot,
 		logger:     logger,

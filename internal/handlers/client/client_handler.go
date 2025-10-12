@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"booking_client/internal/handlers/common"
+	"booking_client/internal/handlers/keyboards"
 	"booking_client/internal/models"
-	"booking_client/internal/services"
+	apiService "booking_client/internal/services/api_service"
 	"booking_client/pkg/telegram"
 
 	"github.com/rs/zerolog"
@@ -16,17 +17,19 @@ import (
 type ClientHandler struct {
 	bot                 *telegram.Bot
 	logger              *zerolog.Logger
-	apiService          *services.APIService
+	apiService          *apiService.APIService
 	notificationService *common.NotificationService
+	keyboards           *keyboards.ClientKeyboards
 }
 
 // NewClientHandler creates a new client handler
-func NewClientHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *services.APIService) *ClientHandler {
+func NewClientHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *apiService.APIService) *ClientHandler {
 	return &ClientHandler{
 		bot:                 bot,
 		logger:              logger,
 		apiService:          apiService,
 		notificationService: common.NewNotificationService(bot, logger, apiService),
+		keyboards:           keyboards.NewClientKeyboards(logger),
 	}
 }
 

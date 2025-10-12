@@ -3,7 +3,7 @@ package client
 import (
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
-	"booking_client/internal/schema"
+	apiService "booking_client/internal/services/api_service"
 	"booking_client/internal/util"
 	"fmt"
 	"time"
@@ -196,7 +196,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 	}
 
 	// Create appointment with RFC3339 format
-	req := &schema.CreateAppointmentRequest{
+	req := &apiService.CreateAppointmentRequest{
 		ClientID:       user.ID,
 		ProfessionalID: user.SelectedProfessionalID,
 		StartTime:      startDateTime.Format(time.RFC3339),
