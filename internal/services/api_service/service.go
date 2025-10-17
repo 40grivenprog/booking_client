@@ -47,6 +47,7 @@ func (s *APIService) addAuthHeader(req *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("failed to create auth token: %w", err)
 	}
+	fmt.Println("authToken", authToken)
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 
