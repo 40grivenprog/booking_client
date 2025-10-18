@@ -40,17 +40,22 @@ jobs:
       id: image_tag
       run: |
         if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
-          echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          TAG="${{ github.event.inputs.image_tag }}"
+          echo "Using provided image tag: $TAG"
         else
           # Get latest tag from ECR for Client
+          echo "Getting latest tag from ECR..."
           LATEST_TAG=$(aws ecr describe-images \
             --repository-name booking-client \
             --region ${{ env.AWS_REGION }} \
             --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
             --output text)
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          TAG="$LATEST_TAG"
+          echo "Using latest ECR tag: $TAG"
         fi
-        echo "Using Client image tag: ${{ steps.image_tag.outputs.tag }}"
+        
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Using Client image tag: $TAG"
         
         # Get ECR registry URL
         ECR_REGISTRY=$(aws ecr describe-registry --region ${{ env.AWS_REGION }} --query 'registryId' --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
