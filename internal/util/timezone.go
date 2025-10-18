@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -11,12 +12,21 @@ var (
 
 // InitTimezone initializes the client application timezone
 func InitTimezone() error {
-	// Load specific timezone (UTC+2 for Europe/Berlin)
+	// Try to load specific timezone (UTC+2 for Europe/Berlin)
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		// Fallback to local timezone if timezone loading fails
+		// Try alternative timezone names
+		alternatives := []string{"Europe/Berlin", "CET", "CEST", "UTC+2"}
+		for _, tz := range alternatives {
+			if loc, err = time.LoadLocation(tz); err == nil {
+				AppTimezone = loc
+				return nil
+			}
+		}
+
+		// Fallback to local timezone if all timezone loading fails
 		AppTimezone = time.Local
-		return err
+		return fmt.Errorf("unknown time zone Europe/Berlin: %w", err)
 	}
 
 	AppTimezone = loc

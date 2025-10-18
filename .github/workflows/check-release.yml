@@ -1,23 +1,44 @@
-name: Check Release Label
+name: Check Version Label
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 jobs:
-  check-label:
-    name: Check Version Label
+  check-version-label:
     runs-on: ubuntu-latest
+    name: Check Version Label
+    
     steps:
-      - name: Check for version label
-        run: |
-          LABELS="${{ github.event.pull_request.labels.*.name }}"
-          echo "PR labels: $LABELS"
-          
-          if echo "$LABELS" | grep -qE "(major|minor|patch)"; then
-            echo "✅ Version label found"
-            exit 0
-          else
-            echo "❌ No version label found. Please add one of: major, minor, patch"
-            exit 1
+    - name: Check for version labels
+      id: check_labels
+      run: |
+        LABELS_ARRAY=(${{ join(github.event.pull_request.labels.*.name, ' ') }})
+        
+        HAS_VERSION_LABEL=false
+        for label in "${LABELS_ARRAY[@]}"; do
+          echo "Checking label: '$label'"
+          if [[ "$label" == "major" ]] || [[ "$label" == "minor" ]] || [[ "$label" == "patch" ]]; then
+            HAS_VERSION_LABEL=true
+            echo "Found version label: $label"
+            break
           fi
+        done
+        
+        if [[ "$HAS_VERSION_LABEL" == "true" ]]; then
+          echo "has_version_label=true" >> $GITHUB_OUTPUT
+          echo "Version label found: ${LABELS_ARRAY[*]}"
+        else
+          echo "has_version_label=false" >> $GITHUB_OUTPUT
+          echo "No version label found. Available labels: ${LABELS_ARRAY[*]}"
+        fi
+
+
+
+    - name: Fail if no version label
+      if: steps.check_labels.outputs.has_version_label == 'false'
+      run: |
+        echo "Version label check failed!"
+        echo "Available labels: ${{ github.event.pull_request.labels.*.name }}"
+        echo "Please add one of: major, minor, patch"
+        exit 1
