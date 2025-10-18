@@ -9,169 +9,184 @@ on:
         default: 'dev'
         type: choice
         options:
-          - dev
-          - prod
+        - dev
+        - prod
       image_tag:
-        description: 'Image tag to deploy (e.g., v1.0.0)'
-        required: true
-        default: 'latest'
+        description: 'Image tag to deploy (leave empty for latest)'
+        required: false
         type: string
+        default: ''
 
 env:
   AWS_REGION: eu-central-1
-  ECR_REPOSITORY: booking-client
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get ECR registry
-        id: get-ecr-registry
-        run: |
-          REGISTRY=$(aws ecr describe-registry --query 'registryId' --output text)
-          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
-          echo "ECR Registry: $REGISTRY"
+    - name: Set image tag
+      id: image_tag
+      run: |
+        if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
+          echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+        else
+          # Get latest tag from ECR for Client
+          LATEST_TAG=$(aws ecr describe-images \
+            --repository-name booking-client \
+            --region ${{ env.AWS_REGION }} \
+            --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
+            --output text)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+        fi
+        echo "Using Client image tag: ${{ steps.image_tag.outputs.tag }}"
+        
+        # Get ECR registry URL
+        ECR_REGISTRY=$(aws ecr describe-registry --region ${{ env.AWS_REGION }} --query 'registryId' --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        echo "ecr_registry=$ECR_REGISTRY" >> $GITHUB_OUTPUT
 
-      - name: Verify image exists
-        run: |
-          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
-          TAG="${{ github.event.inputs.image_tag }}"
-          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
-          
-          echo "Checking if image exists: $IMAGE_URI"
-          if aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --image-ids imageTag=$TAG >/dev/null 2>&1; then
-            echo "✅ Image $TAG found in ECR"
-          else
-            echo "❌ Image $TAG not found in ECR"
-            echo "Available tags:"
-            aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --query 'imageDetails[].imageTags[]' --output table
-            exit 1
-          fi
+    - name: Update ECS Service
+      run: |
+        echo "Updating ECS service with new image..."
+        
+        # Get ECS cluster name
+        CLUSTER_NAME="booking-app-${{ github.event.inputs.environment }}"
+        SERVICE_NAME="booking-client-${{ github.event.inputs.environment }}"
+        
+        # Get current task definition
+        TASK_DEFINITION_ARN=$(aws ecs describe-services \
+          --cluster "$CLUSTER_NAME" \
+          --services "$SERVICE_NAME" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'services[0].taskDefinition' \
+          --output text)
+        
+        echo "Current task definition: $TASK_DEFINITION_ARN"
+        
+        # Get task definition details
+        TASK_DEFINITION=$(aws ecs describe-task-definition \
+          --task-definition "$TASK_DEFINITION_ARN" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'taskDefinition')
+        
+        # Extract only required fields for new task definition
+        NEW_TASK_DEFINITION=$(echo "$TASK_DEFINITION" | jq '{
+          family: .family,
+          taskRoleArn: .taskRoleArn,
+          executionRoleArn: .executionRoleArn,
+          networkMode: .networkMode,
+          containerDefinitions: .containerDefinitions,
+          volumes: .volumes,
+          placementConstraints: .placementConstraints,
+          requiresCompatibilities: .requiresCompatibilities,
+          cpu: .cpu,
+          memory: .memory
+        } | if .tags == null then del(.tags) else . end')
+        
+        # Update image URL in container definitions
+        UPDATED_TASK_DEFINITION=$(echo "$NEW_TASK_DEFINITION" | jq --arg image "${{ steps.image_tag.outputs.ecr_registry }}/booking-client:${{ steps.image_tag.outputs.tag }}" '.containerDefinitions[0].image = $image')
+        
+        # Get secrets from Secrets Manager and add them to task definition
+        echo "Getting secrets from Secrets Manager..."
+        
+        # Get API base URL secret ARN
+        API_BASE_URL_ARN=$(aws secretsmanager describe-secret \
+          --secret-id "dev/booking-client/api-base-url" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'ARN' \
+          --output text)
+        
+        # Get JWT secret ARN
+        JWT_SECRET_ARN=$(aws secretsmanager describe-secret \
+          --secret-id "dev/booking-client/jwt-secret" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'ARN' \
+          --output text)
+        
+        # Get Telegram bot token ARN
+        TELEGRAM_BOT_TOKEN_ARN=$(aws secretsmanager describe-secret \
+          --secret-id "dev/booking-client/telegram-bot-token" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'ARN' \
+          --output text)
+        
+        echo "API_BASE_URL_ARN: $API_BASE_URL_ARN"
+        echo "JWT_SECRET_ARN: $JWT_SECRET_ARN"
+        echo "TELEGRAM_BOT_TOKEN_ARN: $TELEGRAM_BOT_TOKEN_ARN"
+        
+        # Create secrets array for task definition
+        SECRETS_JSON=$(jq -n --arg api_arn "$API_BASE_URL_ARN" --arg jwt_arn "$JWT_SECRET_ARN" --arg telegram_arn "$TELEGRAM_BOT_TOKEN_ARN" '[
+          {
+            "name": "API_BASE_URL",
+            "valueFrom": $api_arn
+          },
+          {
+            "name": "JWT_SECRET", 
+            "valueFrom": $jwt_arn
+          },
+          {
+            "name": "TELEGRAM_BOT_TOKEN",
+            "valueFrom": $telegram_arn
+          }
+        ]')
+        
+        echo "Secrets JSON: $SECRETS_JSON"
+        
+        # Add secrets to task definition
+        UPDATED_TASK_DEFINITION=$(echo "$UPDATED_TASK_DEFINITION" | jq --argjson secrets "$SECRETS_JSON" '.containerDefinitions[0].secrets = $secrets')
+        
+        # Register new task definition
+        NEW_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
+          --cli-input-json "$UPDATED_TASK_DEFINITION" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        
+        echo "New task definition: $NEW_TASK_DEFINITION_ARN"
+        
+        # Update service
+        aws ecs update-service \
+          --cluster "$CLUSTER_NAME" \
+          --service "$SERVICE_NAME" \
+          --task-definition "$NEW_TASK_DEFINITION_ARN" \
+          --region ${{ env.AWS_REGION }}
+        
+        echo "ECS service updated successfully!"
 
-      - name: Get current task definition
-        id: get-current-task-def
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          TASK_DEFINITION_NAME="booking-client-$ENVIRONMENT"
-          
-          echo "Getting current task definition: $TASK_DEFINITION_NAME"
-          CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_NAME --query 'taskDefinition')
-          echo "current_task_def<<EOF" >> $GITHUB_OUTPUT
-          echo "$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+    - name: Wait for Service Update
+      run: |
+        echo "Waiting for service to stabilize..."
+        CLUSTER_NAME="booking-app-${{ github.event.inputs.environment }}"
+        SERVICE_NAME="booking-client-${{ github.event.inputs.environment }}"
+        
+        aws ecs wait services-stable \
+          --cluster "$CLUSTER_NAME" \
+          --services "$SERVICE_NAME" \
+          --region ${{ env.AWS_REGION }}
+        
+        echo "Service is stable!"
 
-      - name: Update task definition with new image
-        id: update-task-def
-        run: |
-          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
-          TAG="${{ github.event.inputs.image_tag }}"
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
-          
-          echo "Updating task definition with image: $IMAGE_URI"
-          
-          # Update the image in the task definition
-          NEW_TASK_DEF=$(echo '${{ steps.get-current-task-def.outputs.current_task_def }}' | jq --arg image "$IMAGE_URI" '.containerDefinitions[0].image = $image')
-          
-          # Remove metadata fields that are not allowed in register-task-definition
-          NEW_TASK_DEF=$(echo "$NEW_TASK_DEF" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
-          
-          # Remove tags if null
-          NEW_TASK_DEF=$(echo "$NEW_TASK_DEF" | jq 'if .tags == null then del(.tags) else . end')
-          
-          echo "new_task_def<<EOF" >> $GITHUB_OUTPUT
-          echo "$NEW_TASK_DEF" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Register new task definition
-        id: register-task-def
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          TASK_DEFINITION_NAME="booking-client-$ENVIRONMENT"
-          
-          echo "Registering new task definition..."
-          NEW_TASK_DEF_ARN=$(echo '${{ steps.update-task-def.outputs.new_task_def }}' | aws ecs register-task-definition --cli-input-json file:///dev/stdin --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "new_task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          echo "New task definition registered: $NEW_TASK_DEF_ARN"
-
-      - name: Update ECS service
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          SERVICE_NAME="booking-client-$ENVIRONMENT"
-          CLUSTER_NAME="booking-app-$ENVIRONMENT"
-          NEW_TASK_DEF_ARN="${{ steps.register-task-def.outputs.new_task_def_arn }}"
-          
-          echo "Updating ECS service: $SERVICE_NAME"
-          echo "Cluster: $CLUSTER_NAME"
-          echo "New task definition: $NEW_TASK_DEF_ARN"
-          
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --task-definition $NEW_TASK_DEF_ARN
-          
-          echo "ECS service updated successfully!"
-
-      - name: Wait for deployment to complete
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          SERVICE_NAME="booking-client-$ENVIRONMENT"
-          CLUSTER_NAME="booking-app-$ENVIRONMENT"
-          
-          echo "Waiting for deployment to complete..."
-          aws ecs wait services-stable \
-            --cluster $CLUSTER_NAME \
-            --services $SERVICE_NAME
-          
-          echo "Deployment completed successfully!"
-
-      - name: Verify deployment
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          SERVICE_NAME="booking-client-$ENVIRONMENT"
-          CLUSTER_NAME="booking-app-$ENVIRONMENT"
-          
-          echo "Verifying deployment..."
-          SERVICE_STATUS=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].status' --output text)
-          RUNNING_COUNT=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].runningCount' --output text)
-          DESIRED_COUNT=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].desiredCount' --output text)
-          
-          echo "Service Status: $SERVICE_STATUS"
-          echo "Running Count: $RUNNING_COUNT"
-          echo "Desired Count: $DESIRED_COUNT"
-          
-          if [[ "$SERVICE_STATUS" == "ACTIVE" && "$RUNNING_COUNT" == "$DESIRED_COUNT" ]]; then
-            echo "✅ Deployment successful!"
-          else
-            echo "❌ Deployment verification failed"
-            exit 1
-          fi
-
-      - name: Show service logs
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          LOG_GROUP="/ecs/booking-client-$ENVIRONMENT"
-          
-          echo "Recent service logs:"
-          aws logs describe-log-streams \
-            --log-group-name $LOG_GROUP \
-            --order-by LastEventTime \
-            --descending \
-            --max-items 1 \
-            --query 'logStreams[0].logStreamName' \
-            --output text | xargs -I {} aws logs get-log-events \
-            --log-group-name $LOG_GROUP \
-            --log-stream-name {} \
-            --start-time $(date -d '5 minutes ago' +%s)000 \
-            --query 'events[].message' \
-            --output text | tail -20
+    - name: Deployment Summary
+      run: |
+        echo "## Deployment Completed Successfully!"
+        echo ""
+        echo "**Environment:** ${{ github.event.inputs.environment }}"
+        echo "**Image Tag:** ${{ steps.image_tag.outputs.tag }}"
+        echo "**Service:** booking-client-${{ github.event.inputs.environment }}"
+        echo ""
+        echo "### Next Steps:"
+        echo "1. Deployment completed"
+        echo "2. Service is stable"
+        echo "3. Monitor logs if needed"
+        echo "4. Ready for use!"
