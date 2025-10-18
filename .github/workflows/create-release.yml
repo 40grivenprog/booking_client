@@ -1,0 +1,163 @@
+name: Create Draft Release
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  create-draft-release:
+    if: >
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'major') ||
+       contains(github.event.pull_request.labels.*.name, 'minor') ||
+       contains(github.event.pull_request.labels.*.name, 'patch'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Get latest published release version
+        id: get_version
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -e
+          echo "Fetching latest published release tag..."
+
+          LATEST_PUBLISHED_TAG=$(gh release list --json tagName,isDraft,createdAt \
+            --jq '[.[] | select(.isDraft == false)] | sort_by(.createdAt) | reverse | .[0].tagName' 2>/dev/null | tr -d '"' || echo "v0.0.0")
+
+          if [[ -z "$LATEST_PUBLISHED_TAG" ]]; then
+            LATEST_PUBLISHED_TAG="v0.0.0"
+          fi
+
+          echo "latest_published_tag=$LATEST_PUBLISHED_TAG" >> "$GITHUB_OUTPUT"
+
+          VERSION=$(echo "$LATEST_PUBLISHED_TAG" | sed 's/^v//;s/[^0-9.].*$//')
+          echo "current_version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          echo "Latest published tag: $LATEST_PUBLISHED_TAG"
+          echo "Parsed current version: $VERSION"
+
+      - name: Calculate new version
+        id: calculate_version
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          set -e
+          CURRENT_VERSION="${{ steps.get_version.outputs.current_version }}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_VERSION:-0.0.0}"
+          PATCH=${PATCH:-0}
+
+          if [[ "$LABELS" == *"major"* ]]; then
+            NEW_MAJOR=$((MAJOR + 1)); NEW_MINOR=0; NEW_PATCH=0; VERSION_TYPE="major"
+          elif [[ "$LABELS" == *"minor"* ]]; then
+            NEW_MAJOR=$MAJOR; NEW_MINOR=$((MINOR + 1)); NEW_PATCH=0; VERSION_TYPE="minor"
+          elif [[ "$LABELS" == *"patch"* ]]; then
+            NEW_MAJOR=$MAJOR; NEW_MINOR=$MINOR; NEW_PATCH=$((PATCH + 1)); VERSION_TYPE="patch"
+          else
+            echo "No version label found."
+            exit 1
+          fi
+
+          NEW_VERSION="${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}"
+          NEW_TAG="v${NEW_VERSION}"
+
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "version_type=$VERSION_TYPE" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes from commits
+        id: get_release_notes
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -e
+          LATEST_PUBLISHED_TAG="${{ steps.get_version.outputs.latest_published_tag }}"
+          CURRENT_PR_TITLE="${{ github.event.pull_request.title }}"
+
+          echo "Building release notes since last release: $LATEST_PUBLISHED_TAG"
+
+          RELEASE_NOTES=""
+
+          if [[ "$LATEST_PUBLISHED_TAG" == "v0.0.0" ]]; then
+            echo "First release — getting all merged PRs"
+            PR_TITLES=$(gh pr list --state merged --base main --json title --jq '.[].title')
+          else
+            LAST_RELEASE_COMMIT=$(git rev-parse "$LATEST_PUBLISHED_TAG" 2>/dev/null || echo "")
+            if [[ -n "$LAST_RELEASE_COMMIT" ]]; then
+              COMMITS=$(git log --oneline "$LAST_RELEASE_COMMIT"..HEAD | awk '{$1=""; print substr($0,2)}')
+              PR_TITLES=""
+              while IFS= read -r msg; do
+                CLEAN_MSG=$(echo "$msg" | sed -E 's/^Merge pull request #[0-9]+ from [^ ]+ *//; s/^Merge branch.*//; s/^fix://; s/^feat://; s/^refactor://; s/^chore://; s/^style://; s/^[[:space:]]+//')
+                if [[ -n "$CLEAN_MSG" ]]; then
+                  PR_TITLES+="${CLEAN_MSG}\n"
+                fi
+              done <<< "$COMMITS"
+            fi
+          fi
+
+          if [[ -z "$PR_TITLES" ]]; then
+            PR_TITLES="$CURRENT_PR_TITLE"
+          fi
+
+          # Format list with '- ' bullets
+          RELEASE_NOTES=$(echo -e "$PR_TITLES" | sed '/^$/d' | sed 's/^/- /')
+
+          echo "release_notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$RELEASE_NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure tag doesn't already exist
+        run: |
+          set -e
+          NEW_TAG="${{ steps.calculate_version.outputs.new_tag }}"
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Removing existing tag $NEW_TAG"
+            git push origin ":refs/tags/$NEW_TAG"
+          fi
+
+      - name: Create Draft Release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -e
+          NEW_TAG="${{ steps.calculate_version.outputs.new_tag }}"
+          VERSION_TYPE="${{ steps.calculate_version.outputs.version_type }}"
+          LATEST_TAG="${{ steps.get_version.outputs.latest_published_tag }}"
+          NOTES="${{ steps.get_release_notes.outputs.release_notes }}"
+
+          echo "Generating clean Markdown release notes..."
+          {
+            echo "## Auto-generated draft release"
+            echo
+            echo "**Version Type:** $VERSION_TYPE  "
+            echo "**Previous Release:** $LATEST_TAG  "
+            echo "**New Tag:** $NEW_TAG  "
+            echo
+            echo "### Changes:"
+            echo "$NOTES"
+            echo
+            echo "---"
+            echo
+            echo "### Next Steps"
+            echo "1. **Publish this release** to trigger *Build and Push Client Image*"
+            echo "2. Wait for build to complete"
+            echo "3. **Run 'Deploy to Environment'** with tag: \`$NEW_TAG\`"
+            echo
+            echo "_Auto-generated draft release by workflow_"
+          } > release_notes.txt
+
+          gh release create "$NEW_TAG" \
+            --title "Release $NEW_TAG" \
+            --notes-file release_notes.txt \
+            --draft
+
+    outputs:
+      new_tag: ${{ steps.calculate_version.outputs.new_tag }}
+      version_type: ${{ steps.calculate_version.outputs.version_type }}

@@ -1,0 +1,68 @@
+name: Build and Push Client Image
+
+on:
+  release:
+    types: [published]
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: booking-client
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ECR registry
+        id: get-ecr-registry
+        run: |
+          REGISTRY=$(aws ecr describe-registry --query 'registryId' --output text)
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          echo "ECR Registry: $REGISTRY"
+
+      - name: Extract tag from release
+        id: extract-tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Building image with tag: $TAG"
+
+      - name: Build and push Docker image
+        run: |
+          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
+          TAG=${{ steps.extract-tag.outputs.tag }}
+          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
+          
+          echo "Building image: $IMAGE_URI"
+          docker build -t $IMAGE_URI .
+          
+          echo "Pushing image to ECR..."
+          docker push $IMAGE_URI
+          
+          echo "Image pushed successfully: $IMAGE_URI"
+
+      - name: Push latest tag
+        run: |
+          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
+          TAG=${{ steps.extract-tag.outputs.tag }}
+          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
+          LATEST_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          
+          echo "Tagging and pushing latest..."
+          docker tag $IMAGE_URI $LATEST_URI
+          docker push $LATEST_URI
+          
+          echo "Latest tag pushed successfully: $LATEST_URI"

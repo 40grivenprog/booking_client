@@ -1,0 +1,177 @@
+name: Deploy to Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      image_tag:
+        description: 'Image tag to deploy (e.g., v1.0.0)'
+        required: true
+        default: 'latest'
+        type: string
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: booking-client
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get ECR registry
+        id: get-ecr-registry
+        run: |
+          REGISTRY=$(aws ecr describe-registry --query 'registryId' --output text)
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          echo "ECR Registry: $REGISTRY"
+
+      - name: Verify image exists
+        run: |
+          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
+          TAG="${{ github.event.inputs.image_tag }}"
+          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
+          
+          echo "Checking if image exists: $IMAGE_URI"
+          if aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --image-ids imageTag=$TAG >/dev/null 2>&1; then
+            echo "✅ Image $TAG found in ECR"
+          else
+            echo "❌ Image $TAG not found in ECR"
+            echo "Available tags:"
+            aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --query 'imageDetails[].imageTags[]' --output table
+            exit 1
+          fi
+
+      - name: Get current task definition
+        id: get-current-task-def
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          TASK_DEFINITION_NAME="booking-client-$ENVIRONMENT"
+          
+          echo "Getting current task definition: $TASK_DEFINITION_NAME"
+          CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_NAME --query 'taskDefinition')
+          echo "current_task_def<<EOF" >> $GITHUB_OUTPUT
+          echo "$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update task definition with new image
+        id: update-task-def
+        run: |
+          REGISTRY=${{ steps.get-ecr-registry.outputs.registry }}
+          TAG="${{ github.event.inputs.image_tag }}"
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          IMAGE_URI=$REGISTRY.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$TAG
+          
+          echo "Updating task definition with image: $IMAGE_URI"
+          
+          # Update the image in the task definition
+          NEW_TASK_DEF=$(echo '${{ steps.get-current-task-def.outputs.current_task_def }}' | jq --arg image "$IMAGE_URI" '.containerDefinitions[0].image = $image')
+          
+          # Remove metadata fields that are not allowed in register-task-definition
+          NEW_TASK_DEF=$(echo "$NEW_TASK_DEF" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
+          
+          # Remove tags if null
+          NEW_TASK_DEF=$(echo "$NEW_TASK_DEF" | jq 'if .tags == null then del(.tags) else . end')
+          
+          echo "new_task_def<<EOF" >> $GITHUB_OUTPUT
+          echo "$NEW_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          TASK_DEFINITION_NAME="booking-client-$ENVIRONMENT"
+          
+          echo "Registering new task definition..."
+          NEW_TASK_DEF_ARN=$(echo '${{ steps.update-task-def.outputs.new_task_def }}' | aws ecs register-task-definition --cli-input-json file:///dev/stdin --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "new_task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "New task definition registered: $NEW_TASK_DEF_ARN"
+
+      - name: Update ECS service
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          SERVICE_NAME="booking-client-$ENVIRONMENT"
+          CLUSTER_NAME="booking-app-$ENVIRONMENT"
+          NEW_TASK_DEF_ARN="${{ steps.register-task-def.outputs.new_task_def_arn }}"
+          
+          echo "Updating ECS service: $SERVICE_NAME"
+          echo "Cluster: $CLUSTER_NAME"
+          echo "New task definition: $NEW_TASK_DEF_ARN"
+          
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --task-definition $NEW_TASK_DEF_ARN
+          
+          echo "ECS service updated successfully!"
+
+      - name: Wait for deployment to complete
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          SERVICE_NAME="booking-client-$ENVIRONMENT"
+          CLUSTER_NAME="booking-app-$ENVIRONMENT"
+          
+          echo "Waiting for deployment to complete..."
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME
+          
+          echo "Deployment completed successfully!"
+
+      - name: Verify deployment
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          SERVICE_NAME="booking-client-$ENVIRONMENT"
+          CLUSTER_NAME="booking-app-$ENVIRONMENT"
+          
+          echo "Verifying deployment..."
+          SERVICE_STATUS=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].status' --output text)
+          RUNNING_COUNT=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].runningCount' --output text)
+          DESIRED_COUNT=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query 'services[0].desiredCount' --output text)
+          
+          echo "Service Status: $SERVICE_STATUS"
+          echo "Running Count: $RUNNING_COUNT"
+          echo "Desired Count: $DESIRED_COUNT"
+          
+          if [[ "$SERVICE_STATUS" == "ACTIVE" && "$RUNNING_COUNT" == "$DESIRED_COUNT" ]]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment verification failed"
+            exit 1
+          fi
+
+      - name: Show service logs
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          LOG_GROUP="/ecs/booking-client-$ENVIRONMENT"
+          
+          echo "Recent service logs:"
+          aws logs describe-log-streams \
+            --log-group-name $LOG_GROUP \
+            --order-by LastEventTime \
+            --descending \
+            --max-items 1 \
+            --query 'logStreams[0].logStreamName' \
+            --output text | xargs -I {} aws logs get-log-events \
+            --log-group-name $LOG_GROUP \
+            --log-stream-name {} \
+            --start-time $(date -d '5 minutes ago' +%s)000 \
+            --query 'events[].message' \
+            --output text | tail -20

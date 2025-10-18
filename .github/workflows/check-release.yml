@@ -1,0 +1,23 @@
+name: Check Release Label
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-label:
+    name: Check Version Label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for version label
+        run: |
+          LABELS="${{ github.event.pull_request.labels.*.name }}"
+          echo "PR labels: $LABELS"
+          
+          if echo "$LABELS" | grep -qE "(major|minor|patch)"; then
+            echo "✅ Version label found"
+            exit 0
+          else
+            echo "❌ No version label found. Please add one of: major, minor, patch"
+            exit 1
+          fi
