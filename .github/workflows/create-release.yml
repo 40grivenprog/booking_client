@@ -94,7 +94,7 @@ jobs:
               COMMITS=$(git log --oneline "$LAST_RELEASE_COMMIT"..HEAD | awk '{$1=""; print substr($0,2)}')
               PR_TITLES=""
               while IFS= read -r msg; do
-                CLEAN_MSG=$(echo "$msg" | sed -E 's/^Merge pull request #[0-9]+ from [^ ]+ *//; s/^Merge branch.*//; s/^fix://; s/^feat://; s/^refactor://; s/^chore://; s/^style://; s/^[[:space:]]+//')
+                CLEAN_MSG=$(echo "$msg" | sed -E 's/^Merge pull request #[0-9]+ from [^ ]+ *//; s/^Merge branch.*//; s/^[[:space:]]+//')
                 if [[ -n "$CLEAN_MSG" ]]; then
                   PR_TITLES+="${CLEAN_MSG}\n"
                 fi
