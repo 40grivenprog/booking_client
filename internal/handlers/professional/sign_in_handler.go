@@ -1,13 +1,15 @@
 package professional
 
 import (
+	"context"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
 )
 
 // StartSignIn starts the professional sign-in process
-func (h *ProfessionalHandler) StartSignIn(chatID int64) {
+func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,
@@ -22,7 +24,7 @@ func (h *ProfessionalHandler) StartSignIn(chatID int64) {
 }
 
 // HandleUsernameInput handles username input for professional sign-in
-func (h *ProfessionalHandler) HandleUsernameInput(chatID int64, username string) {
+func (h *ProfessionalHandler) HandleUsernameInput(ctx context.Context, chatID int64, username string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -35,7 +37,7 @@ func (h *ProfessionalHandler) HandleUsernameInput(chatID int64, username string)
 }
 
 // HandlePasswordInput handles password input for professional sign-in
-func (h *ProfessionalHandler) HandlePasswordInput(chatID int64, password string) {
+func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID int64, password string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -48,7 +50,7 @@ func (h *ProfessionalHandler) HandlePasswordInput(chatID int64, password string)
 		ChatID:   chatID,
 	}
 
-	signedInUser, err := h.apiService.SignInProfessional(req)
+	signedInUser, err := h.apiService.SignInProfessional(ctx, req)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgSignInFailed, err)
 		return
@@ -68,5 +70,5 @@ func (h *ProfessionalHandler) HandlePasswordInput(chatID int64, password string)
 		Build()
 
 	h.sendMessage(chatID, text)
-	h.ShowDashboard(chatID, signedInUser)
+	h.ShowDashboard(ctx, chatID, signedInUser)
 }

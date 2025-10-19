@@ -1,6 +1,8 @@
 package client
 
 import (
+	"context"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
@@ -10,7 +12,7 @@ import (
 )
 
 // HandleBookAppointment starts the appointment booking process
-func (h *ClientHandler) HandleBookAppointment(chatID int64) {
+func (h *ClientHandler) HandleBookAppointment(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if not in any specific state
 	user, valid := h.validateUserState(chatID, []string{
 		models.StateNone,
@@ -24,7 +26,7 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get professionals
-	professionals, err := h.apiService.GetProfessionals()
+	professionals, err := h.apiService.GetProfessionals(ctx)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToLoadProfessionals, err)
 		return
@@ -32,7 +34,7 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 
 	if len(professionals.Professionals) == 0 {
 		h.sendMessage(chatID, common.ErrorMsgNoProfessionals)
-		h.ShowDashboard(chatID)
+		h.ShowDashboard(ctx, chatID)
 		return
 	}
 
@@ -51,7 +53,7 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 }
 
 // HandleProfessionalSelection handles when user selects a professional
-func (h *ClientHandler) HandleProfessionalSelection(chatID int64, professionalID string) {
+func (h *ClientHandler) HandleProfessionalSelection(ctx context.Context, chatID int64, professionalID string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -80,7 +82,7 @@ func (h *ClientHandler) showDateSelection(user *models.User, currentDate time.Ti
 }
 
 // HandleDateSelection handles when user selects a date
-func (h *ClientHandler) HandleDateSelection(chatID int64, date string) {
+func (h *ClientHandler) HandleDateSelection(ctx context.Context, chatID int64, date string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -92,7 +94,7 @@ func (h *ClientHandler) HandleDateSelection(chatID int64, date string) {
 
 	// Get availability for selected date
 	professionalID := user.SelectedProfessionalID
-	availability, err := h.apiService.GetProfessionalAvailability(professionalID, date)
+	availability, err := h.apiService.GetProfessionalAvailability(ctx, professionalID, date)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
 		return
@@ -102,7 +104,7 @@ func (h *ClientHandler) HandleDateSelection(chatID int64, date string) {
 }
 
 // HandleUpcomingAppointmentsMonthNavigation handles month navigation for upcoming appointments
-func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(chatID int64, monthStr string, direction string) {
+func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(ctx context.Context, chatID int64, monthStr string, direction string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -156,7 +158,7 @@ func (h *ClientHandler) showTimeSelection(chatID int64, availability *models.Pro
 }
 
 // HandleTimeSelection handles when user selects a time slot
-func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
+func (h *ClientHandler) HandleTimeSelection(ctx context.Context, chatID int64, startTime string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -202,7 +204,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 		EndTime:        endDateTime.Format(time.RFC3339),
 	}
 
-	appointment, err := h.apiService.CreateAppointment(req)
+	appointment, err := h.apiService.CreateAppointment(ctx, req)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToCreateAppointment, err)
 		return
@@ -220,11 +222,11 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 
 	// Send notification to professional
 	h.notificationService.NotifyProfessionalNewAppointment(appointment)
-	h.ShowDashboard(chatID)
+	h.ShowDashboard(ctx, chatID)
 }
 
 // HandleCancelBooking cancels the current booking process and returns to dashboard
-func (h *ClientHandler) HandleCancelBooking(chatID int64) {
+func (h *ClientHandler) HandleCancelBooking(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if in booking process
 	user, valid := h.validateUserState(chatID, []string{
 		models.StateWaitingForProfessionalSelection,
@@ -251,5 +253,5 @@ func (h *ClientHandler) HandleCancelBooking(chatID int64) {
 	user.LastMessageID = &id
 	user.MessagesToDelete = append(user.MessagesToDelete, &id)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
-	h.ShowDashboard(chatID)
+	h.ShowDashboard(ctx, chatID)
 }

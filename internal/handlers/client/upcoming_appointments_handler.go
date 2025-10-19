@@ -1,15 +1,19 @@
 package client
 
-import "booking_client/internal/handlers/common"
+import (
+	"context"
+
+	"booking_client/internal/handlers/common"
+)
 
 // HandleUpcomingAppointments shows upcoming appointments
-func (h *ClientHandler) HandleUpcomingAppointments(chatID int64) {
+func (h *ClientHandler) HandleUpcomingAppointments(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 
-	appointments, err := h.apiService.GetClientAppointments(user.ID, "confirmed")
+	appointments, err := h.apiService.GetClientAppointments(ctx, user.ID, "confirmed")
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToLoadUpcomingAppointments, err)
 		return
@@ -17,7 +21,7 @@ func (h *ClientHandler) HandleUpcomingAppointments(chatID int64) {
 
 	if len(appointments.Appointments) == 0 {
 		h.sendMessage(chatID, common.UIMsgNoUpcomingAppointments)
-		h.ShowDashboard(chatID)
+		h.ShowDashboard(ctx, chatID)
 		return
 	}
 

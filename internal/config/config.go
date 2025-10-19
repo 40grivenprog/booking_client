@@ -2,62 +2,48 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
+
+	"github.com/caarlos0/env/v11"
 )
 
 // Config holds all configuration for the application
 type Config struct {
-	TelegramToken string
-	APIBaseURL    string
-	JWTSecret     string
-	Debug         bool
-	Port          int
+	// Telegram Bot config
+	TelegramToken string `env:"TELEGRAM_BOT_TOKEN" envDefault:""`
+
+	// API config
+	APIBaseURL string `env:"API_BASE_URL" envDefault:"http://localhost:8080"`
+
+	// JWT config
+	JWTSecret string `env:"JWT_SECRET" envDefault:""`
+
+	// Debug config
+	Debug bool `env:"DEBUG" envDefault:"false"`
+
+	// Port config (for webhook if needed)
+	Port int `env:"PORT" envDefault:"8081"`
+
+	// Log config
+	LogLevel  string `env:"LOG_LEVEL" envDefault:"info"`
+	LogFormat string `env:"LOG_FORMAT" envDefault:"json"`
 }
 
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
-	config := &Config{}
+	cfg := &Config{}
 
-	// Telegram Bot Token
-	config.TelegramToken = os.Getenv("TELEGRAM_BOT_TOKEN")
-	if config.TelegramToken == "" {
+	if err := env.Parse(cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse environment variables: %w", err)
+	}
+
+	// Validate required fields
+	if cfg.TelegramToken == "" {
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN environment variable is required")
 	}
 
-	// API Base URL
-	config.APIBaseURL = os.Getenv("API_BASE_URL")
-	if config.APIBaseURL == "" {
-		config.APIBaseURL = "http://localhost:8080" // Default API URL
-	}
-
-	// JWT Secret (must match booking_api secret)
-	config.JWTSecret = os.Getenv("JWT_SECRET")
-	if config.JWTSecret == "" {
+	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET environment variable is required")
 	}
 
-	// Debug mode
-	debugStr := os.Getenv("DEBUG")
-	if debugStr != "" {
-		debug, err := strconv.ParseBool(debugStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid DEBUG value: %v", err)
-		}
-		config.Debug = debug
-	}
-
-	// Port (for webhook if needed)
-	portStr := os.Getenv("PORT")
-	if portStr != "" {
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid PORT value: %v", err)
-		}
-		config.Port = port
-	} else {
-		config.Port = 8081 // Default port
-	}
-
-	return config, nil
+	return cfg, nil
 }

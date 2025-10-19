@@ -54,6 +54,21 @@ func (s *APIService) addAuthHeader(req *http.Request) error {
 	return nil
 }
 
+// addRequestHeaders adds common headers including request_id to the request
+func (s *APIService) addRequestHeaders(req *http.Request, requestID string) error {
+	// Add auth header
+	if err := s.addAuthHeader(req); err != nil {
+		return err
+	}
+
+	// Add request_id header
+	if requestID != "" {
+		req.Header.Set("X-Request-ID", requestID)
+	}
+
+	return nil
+}
+
 // GetUserRepository returns the user repository for direct access if needed
 func (s *APIService) GetUserRepository() *repository.UserRepository {
 	return s.userRepository

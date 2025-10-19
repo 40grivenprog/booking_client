@@ -1,24 +1,26 @@
 package professional
 
 import (
-	"booking_client/internal/handlers/common"
-	"booking_client/internal/models"
+	"context"
 	"fmt"
 	"time"
+
+	"booking_client/internal/handlers/common"
+	"booking_client/internal/models"
 )
 
 // HandleUpcomingAppointments shows upcoming appointments for professionals
-func (h *ProfessionalHandler) HandleUpcomingAppointments(chatID int64) {
+func (h *ProfessionalHandler) HandleUpcomingAppointments(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 
-	h.showUpcomingAppointmentsDatePicker(chatID, user)
+	h.showUpcomingAppointmentsDatePicker(ctx, chatID, user)
 }
 
 // showUpcomingAppointmentsDatePicker shows date picker for upcoming appointments
-func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, user *models.User, month ...string) {
+func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(ctx context.Context, chatID int64, user *models.User, month ...string) {
 	var targetMonth string
 	if len(month) > 0 {
 		targetMonth = month[0]
@@ -26,7 +28,7 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, u
 		targetMonth = time.Now().Format("2006-01")
 	}
 
-	appointmentDates, err := h.apiService.GetProfessionalAppointmentDates(user.ID, targetMonth)
+	appointmentDates, err := h.apiService.GetProfessionalAppointmentDates(ctx, user.ID, targetMonth)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
@@ -38,7 +40,7 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(chatID int64, u
 }
 
 // HandleUpcomingAppointmentsMonthNavigation handles month navigation for upcoming appointments
-func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(chatID int64, monthStr string, direction string) {
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(ctx context.Context, chatID int64, monthStr string, direction string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -57,17 +59,17 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(chatID i
 		newMonth = currentMonth.AddDate(0, 1, 0)
 	}
 
-	h.showUpcomingAppointmentsDatePicker(chatID, user, newMonth.Format("2006-01"))
+	h.showUpcomingAppointmentsDatePicker(ctx, chatID, user, newMonth.Format("2006-01"))
 }
 
 // HandleUpcomingAppointmentsDateSelection handles date selection from upcoming appointments picker
-func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(chatID int64, dateStr string) {
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx context.Context, chatID int64, dateStr string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 
-	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(user.ID, "confirmed", dateStr)
+	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(ctx, user.ID, "confirmed", dateStr)
 	if err != nil {
 		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
@@ -75,7 +77,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(chatID int
 
 	if len(appointments.Appointments) == 0 {
 		h.sendMessage(chatID, common.UIMsgNoUpcomingAppointments)
-		h.ShowDashboard(chatID, user)
+		h.ShowDashboard(ctx, chatID, user)
 		return
 	}
 

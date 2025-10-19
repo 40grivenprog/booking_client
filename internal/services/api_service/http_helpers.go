@@ -2,6 +2,7 @@ package api_service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -101,6 +102,39 @@ func (s *APIService) makePatchRequest(url string, reqBody interface{}, result in
 	body, err := s.makeRequest(http.MethodPatch, url, reqBody, http.StatusOK)
 	if err != nil {
 		return err
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// makeGetRequestWithContext performs a GET request with context and request_id header
+func (s *APIService) makeGetRequestWithContext(ctx context.Context, url string, result interface{}, requestID string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if err := s.addRequestHeaders(req, requestID); err != nil {
+		return err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return s.parseAPIError(resp.StatusCode, body)
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {
