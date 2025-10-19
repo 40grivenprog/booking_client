@@ -13,7 +13,7 @@ func (s *APIService) RegisterClient(ctx context.Context, req *RegisterRequest) (
 	url := s.buildURL("api", "clients", "register")
 
 	var response models.ClientRegisterResponse
-	if err := s.makePostRequest(url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 
@@ -45,7 +45,7 @@ func (s *APIService) CancelClientAppointment(ctx context.Context, clientID, appo
 	url := s.buildURL("api", "clients", clientID, "appointments", appointmentID, "cancel")
 
 	var response models.CancelClientAppointmentResponse
-	if err := s.makePatchRequest(url, req, &response); err != nil {
+	if err := s.makePatchRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 

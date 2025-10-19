@@ -11,7 +11,7 @@ func (s *APIService) CreateAppointment(ctx context.Context, req *CreateAppointme
 	url := s.buildURL("api", "appointments")
 
 	var response models.CreateAppointmentResponse
-	if err := s.makePostRequest(url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 

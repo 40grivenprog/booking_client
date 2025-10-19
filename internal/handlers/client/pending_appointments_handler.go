@@ -15,7 +15,7 @@ func (h *ClientHandler) HandlePendingAppointments(ctx context.Context, chatID in
 
 	appointments, err := h.apiService.GetClientAppointments(ctx, user.ID, "pending")
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (h *ClientHandler) HandlePendingAppointments(ctx context.Context, chatID in
 	keyboard := h.createAppointmentsKeyboard(appointments.Appointments, common.BtnCancelAppointment)
 	id, err := h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id

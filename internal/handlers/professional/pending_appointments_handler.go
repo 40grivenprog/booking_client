@@ -18,7 +18,7 @@ func (h *ProfessionalHandler) HandlePendingAppointments(ctx context.Context, cha
 
 	appointments, err := h.apiService.GetProfessionalAppointments(ctx, user.ID, "pending")
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *ProfessionalHandler) HandleConfirmAppointment(ctx context.Context, chat
 
 	response, err := h.apiService.ConfirmProfessionalAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToConfirmAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToConfirmAppointment, err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *ProfessionalHandler) HandleCancellationReason(ctx context.Context, chat
 
 	response, err := h.apiService.CancelProfessionalAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCancelAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCancelAppointment, err)
 		return
 	}
 

@@ -30,7 +30,7 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(ctx context.Con
 
 	appointmentDates, err := h.apiService.GetProfessionalAppointmentDates(ctx, user.ID, targetMonth)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx contex
 
 	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(ctx, user.ID, "confirmed", dateStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
 	}
 

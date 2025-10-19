@@ -11,7 +11,7 @@ import (
 )
 
 // makeRequest performs an HTTP request with auth header and returns the response body
-func (s *APIService) makeRequest(method, url string, body interface{}, expectedStatus int) ([]byte, error) {
+func (s *APIService) makeRequest(ctx context.Context, method, url string, body interface{}, expectedStatus int) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		jsonData, err := json.Marshal(body)
@@ -21,7 +21,7 @@ func (s *APIService) makeRequest(method, url string, body interface{}, expectedS
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, reqBody)
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -69,23 +69,9 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 	}
 }
 
-// makeGetRequest performs a GET request and unmarshals the response
-func (s *APIService) makeGetRequest(url string, result interface{}) error {
-	body, err := s.makeRequest(http.MethodGet, url, nil, http.StatusOK)
-	if err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(body, result); err != nil {
-		return fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return nil
-}
-
 // makePostRequest performs a POST request and unmarshals the response
-func (s *APIService) makePostRequest(url string, reqBody interface{}, result interface{}) error {
-	body, err := s.makeRequest(http.MethodPost, url, reqBody, http.StatusCreated)
+func (s *APIService) makePostRequest(ctx context.Context, url string, reqBody interface{}, result interface{}) error {
+	body, err := s.makeRequest(ctx, http.MethodPost, url, reqBody, http.StatusCreated)
 	if err != nil {
 		return err
 	}
@@ -98,8 +84,8 @@ func (s *APIService) makePostRequest(url string, reqBody interface{}, result int
 }
 
 // makePatchRequest performs a PATCH request and unmarshals the response
-func (s *APIService) makePatchRequest(url string, reqBody interface{}, result interface{}) error {
-	body, err := s.makeRequest(http.MethodPatch, url, reqBody, http.StatusOK)
+func (s *APIService) makePatchRequest(ctx context.Context, url string, reqBody interface{}, result interface{}) error {
+	body, err := s.makeRequest(ctx, http.MethodPatch, url, reqBody, http.StatusOK)
 	if err != nil {
 		return err
 	}

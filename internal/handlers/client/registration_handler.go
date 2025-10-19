@@ -19,7 +19,7 @@ func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64) {
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgClientRegistration)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (h *ClientHandler) HandleFirstNameInput(ctx context.Context, chatID int64, 
 
 	id, err := h.bot.SendMessageWithID(chatID, common.SuccessMsgFirstNameSaved)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -60,7 +60,7 @@ func (h *ClientHandler) HandleLastNameInput(ctx context.Context, chatID int64, l
 
 	id, err := h.bot.SendMessageWithID(chatID, common.SuccessMsgLastNameSaved)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -91,7 +91,7 @@ func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phon
 
 	response, err := h.apiService.RegisterClient(ctx, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgRegistrationFailed, err)
+		h.sendError(ctx, chatID, common.ErrorMsgRegistrationFailed, err)
 		return
 	}
 	user.ID = response.ID
@@ -117,7 +117,7 @@ func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phon
 
 	id, err := h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id

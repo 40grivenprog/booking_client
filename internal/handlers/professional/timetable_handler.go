@@ -24,7 +24,7 @@ func (h *ProfessionalHandler) HandleTimetable(ctx context.Context, chatID int64)
 func (h *ProfessionalHandler) showTimetable(ctx context.Context, chatID int64, user *models.User, dateStr string) {
 	timetable, err := h.apiService.GetProfessionalTimetable(ctx, user.ID, dateStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func (h *ProfessionalHandler) HandleTimetableDateNavigation(ctx context.Context,
 
 	currentDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgInvalidDateFormat, err)
+		h.sendError(ctx, chatID, common.ErrorMsgInvalidDateFormat, err)
 		return
 	}
 

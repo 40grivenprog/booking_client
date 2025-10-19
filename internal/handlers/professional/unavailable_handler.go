@@ -35,7 +35,7 @@ func (h *ProfessionalHandler) showUnavailableDateSelection(chatID int64, current
 
 // HandleUnavailableDateSelection handles when user selects a date for unavailable time
 func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context, chatID int64, date string) {
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {
@@ -49,7 +49,7 @@ func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context
 	// Get availability for selected date to show time slots
 	availability, err := h.apiService.GetProfessionalAvailability(ctx, user.ID, date)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, av
 
 // HandleUnavailableStartTimeSelection handles when user selects start time for unavailable period
 func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Context, chatID int64, startTime string) {
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableStartTime,
 	})
 	if !valid {
@@ -79,7 +79,7 @@ func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Co
 	// Get availability for the selected date to determine available end times
 	availability, err := h.apiService.GetProfessionalAvailability(ctx, user.ID, user.SelectedDate)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, star
 
 // HandleUnavailableEndTimeSelection handles when user selects end time for unavailable period
 func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Context, chatID int64, endTime string) {
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableEndTime,
 	})
 	if !valid {
@@ -154,7 +154,7 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Cont
 
 // HandleUnavailableDescription handles when user provides description for unavailable period
 func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, chatID int64, description string) {
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDescription,
 	})
 	if !valid {
@@ -189,7 +189,7 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, 
 
 	appointment, err := h.apiService.CreateUnavailableAppointment(ctx, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCreateUnavailableAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCreateUnavailableAppointment, err)
 		return
 	}
 	// Clear state
@@ -221,7 +221,7 @@ func (h *ProfessionalHandler) HandleCancelUnavailable(ctx context.Context, chatI
 // HandlePrevUnavailableMonth handles previous month navigation for unavailable appointments
 func (h *ProfessionalHandler) HandlePrevUnavailableMonth(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if waiting for unavailable date selection
-	_, valid := h.validateUserState(chatID, []string{
+	_, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {
@@ -236,7 +236,7 @@ func (h *ProfessionalHandler) HandlePrevUnavailableMonth(ctx context.Context, ch
 // HandleNextUnavailableMonth handles next month navigation for unavailable appointments
 func (h *ProfessionalHandler) HandleNextUnavailableMonth(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if waiting for unavailable date selection
-	_, valid := h.validateUserState(chatID, []string{
+	_, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {

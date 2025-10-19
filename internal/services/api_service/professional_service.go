@@ -16,7 +16,7 @@ func (s *APIService) RegisterProfessional(ctx context.Context, req *RegisterRequ
 		User models.User `json:"user"`
 	}
 
-	if err := s.makePostRequest(url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 
@@ -35,7 +35,7 @@ func (s *APIService) SignInProfessional(ctx context.Context, req *ProfessionalSi
 		User models.User `json:"user"`
 	}
 
-	if err := s.makePostRequest(url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 
@@ -116,7 +116,7 @@ func (s *APIService) ConfirmProfessionalAppointment(ctx context.Context, profess
 	url := s.buildURL("api", "professionals", professionalID, "appointments", appointmentID, "confirm")
 
 	var response models.ConfirmProfessionalAppointmentResponse
-	if err := s.makePatchRequest(url, req, &response); err != nil {
+	if err := s.makePatchRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (s *APIService) CancelProfessionalAppointment(ctx context.Context, professi
 	url := s.buildURL("api", "professionals", professionalID, "appointments", appointmentID, "cancel")
 
 	var response models.CancelProfessionalAppointmentResponse
-	if err := s.makePatchRequest(url, req, &response); err != nil {
+	if err := s.makePatchRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +140,7 @@ func (s *APIService) CreateUnavailableAppointment(ctx context.Context, req *Crea
 	url := s.buildURL("api", "professionals", req.ProfessionalID, "unavailable_appointments")
 
 	var response models.CreateUnavailableAppointmentResponse
-	if err := s.makePostRequest(url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}
 

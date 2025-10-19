@@ -1,8 +1,9 @@
 package client
 
 import (
-	"booking_client/internal/handlers/common"
+	"booking_client/internal/common"
 	"booking_client/internal/models"
+	"context"
 	"fmt"
 	"time"
 
@@ -10,10 +11,11 @@ import (
 )
 
 // sendError sends an error message to the user
-func (h *ClientHandler) sendError(chatID int64, message string, err error) {
+func (h *ClientHandler) sendError(ctx context.Context, chatID int64, message string, err error) {
 	text := fmt.Sprintf(message, err)
 	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send error message")
+		logger := common.GetLogger(ctx)
+		logger.Error().Err(err).Msg("Failed to send error message")
 	}
 }
 
@@ -56,8 +58,8 @@ func (h *ClientHandler) editMessageWithKeyboard(chatID int64, messageID int, tex
 }
 
 // validateUserState checks if user is in a valid state for the given action
-func (h *ClientHandler) validateUserState(chatID int64, allowedStates []string) (*models.User, bool) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ClientHandler) validateUserState(ctx context.Context, chatID int64, allowedStates []string) (*models.User, bool) {
+	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, common.GetLogger(ctx), chatID)
 	if !ok {
 		return nil, false
 	}

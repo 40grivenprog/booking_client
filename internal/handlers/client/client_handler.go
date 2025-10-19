@@ -54,7 +54,7 @@ func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
 	}()
 	id, err := h.sendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.MessagesToDelete = nil

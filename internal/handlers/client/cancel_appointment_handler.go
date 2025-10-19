@@ -22,7 +22,7 @@ func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int6
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgCancellationReason)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -45,7 +45,7 @@ func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int
 
 	response, err := h.apiService.CancelClientAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCancelAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCancelAppointment, err)
 		return
 	}
 
