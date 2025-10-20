@@ -1,6 +1,8 @@
 package professional
 
 import (
+	"context"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/handlers/keyboards"
 	"booking_client/internal/models"
@@ -32,7 +34,7 @@ func NewProfessionalHandler(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 }
 
 // ShowDashboard shows the professional dashboard with appointment options
-func (h *ProfessionalHandler) ShowDashboard(chatID int64, user *models.User) {
+func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, user *models.User) {
 	currentUser, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return

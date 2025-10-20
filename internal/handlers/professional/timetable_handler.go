@@ -1,28 +1,30 @@
 package professional
 
 import (
-	"booking_client/internal/handlers/common"
-	"booking_client/internal/models"
+	"context"
 	"fmt"
 	"time"
+
+	"booking_client/internal/handlers/common"
+	"booking_client/internal/models"
 )
 
 // HandleTimetable shows the professional's timetable for the current date
-func (h *ProfessionalHandler) HandleTimetable(chatID int64) {
+func (h *ProfessionalHandler) HandleTimetable(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 
 	currentDate := time.Now().Format("2006-01-02")
-	h.showTimetable(chatID, user, currentDate)
+	h.showTimetable(ctx, chatID, user, currentDate)
 }
 
 // showTimetable shows the professional's timetable for a specific date
-func (h *ProfessionalHandler) showTimetable(chatID int64, user *models.User, dateStr string) {
-	timetable, err := h.apiService.GetProfessionalTimetable(user.ID, dateStr)
+func (h *ProfessionalHandler) showTimetable(ctx context.Context, chatID int64, user *models.User, dateStr string) {
+	timetable, err := h.apiService.GetProfessionalTimetable(ctx, user.ID, dateStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAppointments, err)
 		return
 	}
 
@@ -44,7 +46,7 @@ func (h *ProfessionalHandler) showTimetable(chatID int64, user *models.User, dat
 }
 
 // HandleTimetableDateNavigation handles timetable date navigation
-func (h *ProfessionalHandler) HandleTimetableDateNavigation(chatID int64, dateStr string, direction string) {
+func (h *ProfessionalHandler) HandleTimetableDateNavigation(ctx context.Context, chatID int64, dateStr string, direction string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -52,7 +54,7 @@ func (h *ProfessionalHandler) HandleTimetableDateNavigation(chatID int64, dateSt
 
 	currentDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgInvalidDateFormat, err)
+		h.sendError(ctx, chatID, common.ErrorMsgInvalidDateFormat, err)
 		return
 	}
 
@@ -64,5 +66,5 @@ func (h *ProfessionalHandler) HandleTimetableDateNavigation(chatID int64, dateSt
 	}
 
 	newDateStr := newDate.Format("2006-01-02")
-	h.showTimetable(chatID, user, newDateStr)
+	h.showTimetable(ctx, chatID, user, newDateStr)
 }

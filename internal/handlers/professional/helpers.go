@@ -1,8 +1,9 @@
 package professional
 
 import (
-	"booking_client/internal/handlers/common"
+	"booking_client/internal/common"
 	"booking_client/internal/models"
+	"context"
 	"fmt"
 	"time"
 
@@ -12,10 +13,11 @@ import (
 // Professional-specific helper functions
 
 // sendError sends an error message to the user (ProfessionalHandler version)
-func (h *ProfessionalHandler) sendError(chatID int64, message string, err error) {
-	text := fmt.Sprintf(message, err)
+func (h *ProfessionalHandler) sendError(ctx context.Context, chatID int64, message string, err error) {
+	text := fmt.Sprintf(message, err.Error())
 	if err := h.bot.SendMessage(chatID, text); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to send error message")
+		logger := common.GetLogger(ctx)
+		logger.Error().Err(err).Msg("Failed to send error message")
 	}
 }
 
@@ -58,8 +60,8 @@ func (h *ProfessionalHandler) editMessageWithKeyboard(chatID int64, messageID in
 }
 
 // validateUserState checks if user is in a valid state for the given action (ProfessionalHandler version)
-func (h *ProfessionalHandler) validateUserState(chatID int64, allowedStates []string) (*models.User, bool) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ProfessionalHandler) validateUserState(ctx context.Context, chatID int64, allowedStates []string) (*models.User, bool) {
+	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, common.GetLogger(ctx), chatID)
 	if !ok {
 		return nil, false
 	}

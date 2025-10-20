@@ -1,28 +1,30 @@
 package professional
 
 import (
+	"context"
+	"time"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
-	"time"
 )
 
 // HandlePendingAppointments shows pending appointments for professionals
-func (h *ProfessionalHandler) HandlePendingAppointments(chatID int64) {
+func (h *ProfessionalHandler) HandlePendingAppointments(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 
-	appointments, err := h.apiService.GetProfessionalAppointments(user.ID, "pending")
+	appointments, err := h.apiService.GetProfessionalAppointments(ctx, user.ID, "pending")
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadPendingAppointments, err)
 		return
 	}
 
 	if len(appointments.Appointments) == 0 {
 		h.sendMessage(chatID, common.UIMsgNoPendingAppointments)
-		h.ShowDashboard(chatID, user)
+		h.ShowDashboard(ctx, chatID, user)
 		return
 	}
 
@@ -36,7 +38,7 @@ func (h *ProfessionalHandler) HandlePendingAppointments(chatID int64) {
 }
 
 // HandleConfirmAppointment handles professional appointment confirmation
-func (h *ProfessionalHandler) HandleConfirmAppointment(chatID int64, appointmentID string) {
+func (h *ProfessionalHandler) HandleConfirmAppointment(ctx context.Context, chatID int64, appointmentID string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -45,9 +47,9 @@ func (h *ProfessionalHandler) HandleConfirmAppointment(chatID int64, appointment
 	// Confirm the appointment
 	req := &apiService.ConfirmAppointmentRequest{}
 
-	response, err := h.apiService.ConfirmProfessionalAppointment(user.ID, appointmentID, req)
+	response, err := h.apiService.ConfirmProfessionalAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToConfirmAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToConfirmAppointment, err)
 		return
 	}
 
@@ -83,7 +85,7 @@ func (h *ProfessionalHandler) HandleConfirmAppointment(chatID int64, appointment
 }
 
 // HandleCancelAppointment starts the professional appointment cancellation process
-func (h *ProfessionalHandler) HandleCancelAppointment(chatID int64, appointmentID string) {
+func (h *ProfessionalHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -98,7 +100,7 @@ func (h *ProfessionalHandler) HandleCancelAppointment(chatID int64, appointmentI
 }
 
 // HandleCancellationReason handles the professional cancellation reason input
-func (h *ProfessionalHandler) HandleCancellationReason(chatID int64, reason string) {
+func (h *ProfessionalHandler) HandleCancellationReason(ctx context.Context, chatID int64, reason string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -110,9 +112,9 @@ func (h *ProfessionalHandler) HandleCancellationReason(chatID int64, reason stri
 		CancellationReason: reason,
 	}
 
-	response, err := h.apiService.CancelProfessionalAppointment(user.ID, appointmentID, req)
+	response, err := h.apiService.CancelProfessionalAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCancelAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCancelAppointment, err)
 		return
 	}
 
@@ -136,5 +138,5 @@ func (h *ProfessionalHandler) HandleCancellationReason(chatID int64, reason stri
 
 	// Notify client about cancellation
 	h.notificationService.NotifyClientProfessionalCancellation(response)
-	h.ShowDashboard(chatID, user)
+	h.ShowDashboard(ctx, chatID, user)
 }

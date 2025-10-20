@@ -1,6 +1,8 @@
 package client
 
 import (
+	"context"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
@@ -8,7 +10,7 @@ import (
 )
 
 // HandleCancelAppointment starts the appointment cancellation process
-func (h *ClientHandler) HandleCancelAppointment(chatID int64, appointmentID string) {
+func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string) {
 	// Store appointment ID and ask for cancellation reason
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
@@ -20,7 +22,7 @@ func (h *ClientHandler) HandleCancelAppointment(chatID int64, appointmentID stri
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgCancellationReason)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -29,7 +31,7 @@ func (h *ClientHandler) HandleCancelAppointment(chatID int64, appointmentID stri
 }
 
 // HandleCancellationReason handles the cancellation reason input
-func (h *ClientHandler) HandleCancellationReason(chatID int64, reason string) {
+func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int64, reason string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -41,9 +43,9 @@ func (h *ClientHandler) HandleCancellationReason(chatID int64, reason string) {
 		CancellationReason: reason,
 	}
 
-	response, err := h.apiService.CancelClientAppointment(user.ID, appointmentID, req)
+	response, err := h.apiService.CancelClientAppointment(ctx, user.ID, appointmentID, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCancelAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCancelAppointment, err)
 		return
 	}
 
@@ -62,5 +64,5 @@ func (h *ClientHandler) HandleCancellationReason(chatID int64, reason string) {
 
 	// Notify professional about cancellation
 	h.notificationService.NotifyProfessionalCancellation(response)
-	h.ShowDashboard(chatID)
+	h.ShowDashboard(ctx, chatID)
 }

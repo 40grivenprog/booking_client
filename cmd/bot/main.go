@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"booking_client/internal/config"
 	"booking_client/internal/handlers"
@@ -35,22 +34,20 @@ func main() {
 		log.Info().Str("timezone", util.GetAppTimezone().String()).Msg("Timezone initialized")
 	}
 
-	// Initialize logger
-	zerolog.TimeFieldFormat = time.RFC3339
+	// Configure logger
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	// Configure console writer for development
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-	logger := zerolog.New(output).With().Timestamp().Logger()
+	// Use JSON format for production logs
+	log.Logger = log.Output(os.Stdout)
 
 	// Initialize Telegram bot
-	bot, err := telegram.NewBot(cfg.TelegramToken, &logger)
+	bot, err := telegram.NewBot(cfg.TelegramToken, &log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Telegram bot")
 	}
 
 	// Initialize handlers
-	handler, err := handlers.NewHandler(bot, cfg, &logger)
+	handler, err := handlers.NewHandler(bot, cfg, &log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize handlers")
 	}
@@ -58,7 +55,7 @@ func main() {
 	// Register command handlers
 	handler.RegisterHandlers()
 
-	logger.Info().Msg("Starting Telegram bot...")
+	log.Info().Msg("Starting Telegram bot...")
 
 	// Start the bot
 	if err := bot.Start(); err != nil {
@@ -70,6 +67,6 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info().Msg("Shutting down bot...")
+	log.Info().Msg("Shutting down bot...")
 	bot.Stop()
 }

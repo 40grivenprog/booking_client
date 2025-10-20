@@ -1,7 +1,9 @@
 package client
 
 import (
-	"booking_client/internal/handlers/common"
+	"context"
+
+	handlersCommon "booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
 	"booking_client/internal/util"
@@ -10,9 +12,9 @@ import (
 )
 
 // HandleBookAppointment starts the appointment booking process
-func (h *ClientHandler) HandleBookAppointment(chatID int64) {
+func (h *ClientHandler) HandleBookAppointment(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if not in any specific state
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateNone,
 	})
 	if !valid {
@@ -24,22 +26,22 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get professionals
-	professionals, err := h.apiService.GetProfessionals()
+	professionals, err := h.apiService.GetProfessionals(ctx)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadProfessionals, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToLoadProfessionals, err)
 		return
 	}
 
 	if len(professionals.Professionals) == 0 {
-		h.sendMessage(chatID, common.ErrorMsgNoProfessionals)
-		h.ShowDashboard(chatID)
+		h.sendMessage(chatID, handlersCommon.ErrorMsgNoProfessionals)
+		h.ShowDashboard(ctx, chatID)
 		return
 	}
 
 	keyboard := h.createProfessionalsKeyboard(professionals.Professionals)
-	id, err := h.sendMessageWithKeyboardAndID(chatID, common.UIMsgSelectProfessional, keyboard)
+	id, err := h.sendMessageWithKeyboardAndID(chatID, handlersCommon.UIMsgSelectProfessional, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	if user.LastMessageID != nil {
@@ -51,8 +53,8 @@ func (h *ClientHandler) HandleBookAppointment(chatID int64) {
 }
 
 // HandleProfessionalSelection handles when user selects a professional
-func (h *ClientHandler) HandleProfessionalSelection(chatID int64, professionalID string) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ClientHandler) HandleProfessionalSelection(ctx context.Context, chatID int64, professionalID string) {
+	user, ok := handlersCommon.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
@@ -62,16 +64,16 @@ func (h *ClientHandler) HandleProfessionalSelection(chatID int64, professionalID
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Show current month dates
-	h.showDateSelection(user, time.Now())
+	h.showDateSelection(ctx, user, time.Now())
 }
 
 // showDateSelection shows available dates for the current month
-func (h *ClientHandler) showDateSelection(user *models.User, currentDate time.Time) {
-	text := fmt.Sprintf(common.UIMsgSelectDate, currentDate.Month(), currentDate.Year())
+func (h *ClientHandler) showDateSelection(ctx context.Context, user *models.User, currentDate time.Time) {
+	text := fmt.Sprintf(handlersCommon.UIMsgSelectDate, currentDate.Month(), currentDate.Year())
 	keyboard := h.createDateKeyboard(currentDate)
 	id, err := h.bot.SendMessageWithKeyboardAndID(*user.ChatID, text, keyboard)
 	if err != nil {
-		h.sendError(*user.ChatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, *user.ChatID, handlersCommon.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -80,8 +82,8 @@ func (h *ClientHandler) showDateSelection(user *models.User, currentDate time.Ti
 }
 
 // HandleDateSelection handles when user selects a date
-func (h *ClientHandler) HandleDateSelection(chatID int64, date string) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ClientHandler) HandleDateSelection(ctx context.Context, chatID int64, date string) {
+	user, ok := handlersCommon.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
@@ -92,18 +94,18 @@ func (h *ClientHandler) HandleDateSelection(chatID int64, date string) {
 
 	// Get availability for selected date
 	professionalID := user.SelectedProfessionalID
-	availability, err := h.apiService.GetProfessionalAvailability(professionalID, date)
+	availability, err := h.apiService.GetProfessionalAvailability(ctx, professionalID, date)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
-	h.showTimeSelection(chatID, availability)
+	h.showTimeSelection(ctx, chatID, availability)
 }
 
 // HandleUpcomingAppointmentsMonthNavigation handles month navigation for upcoming appointments
-func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(chatID int64, monthStr string, direction string) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(ctx context.Context, chatID int64, monthStr string, direction string) {
+	user, ok := handlersCommon.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
@@ -111,13 +113,13 @@ func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(chatID int64, mont
 	// Parse current month
 	currentMonth, err := time.Parse("2006-01", monthStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgInvalidDateFormat, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgInvalidDateFormat, err)
 		return
 	}
 
 	// Calculate new month based on direction
 	var newMonth time.Time
-	if direction == common.DirectionPrev {
+	if direction == handlersCommon.DirectionPrev {
 		newMonth = currentMonth.AddDate(0, -1, 0)
 	} else {
 		newMonth = currentMonth.AddDate(0, 1, 0)
@@ -126,26 +128,26 @@ func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(chatID int64, mont
 	newMonthStr := newMonth.Format("2006-01")
 	newMonthTime, err := time.Parse("2006-01", newMonthStr)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgInvalidDateFormat, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgInvalidDateFormat, err)
 		return
 	}
 	h.bot.DeleteMessage(chatID, *user.LastMessageID)
 	user.LastMessageID = nil
 	h.apiService.GetUserRepository().SetUser(chatID, user)
-	h.showDateSelection(user, newMonthTime)
+	h.showDateSelection(ctx, user, newMonthTime)
 }
 
 // showTimeSelection shows available time slots
-func (h *ClientHandler) showTimeSelection(chatID int64, availability *models.ProfessionalAvailabilityResponse) {
-	text := fmt.Sprintf(common.UIMsgSelectTime, availability.Date)
+func (h *ClientHandler) showTimeSelection(ctx context.Context, chatID int64, availability *models.ProfessionalAvailabilityResponse) {
+	text := fmt.Sprintf(handlersCommon.UIMsgSelectTime, availability.Date)
 	keyboard := h.createTimeKeyboard(availability)
 	id, err := h.sendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+	user, ok := handlersCommon.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
@@ -156,8 +158,8 @@ func (h *ClientHandler) showTimeSelection(chatID int64, availability *models.Pro
 }
 
 // HandleTimeSelection handles when user selects a time slot
-func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
-	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
+func (h *ClientHandler) HandleTimeSelection(ctx context.Context, chatID int64, startTime string) {
+	user, ok := handlersCommon.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
@@ -167,7 +169,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 	start, err := time.Parse("15:04", startTime)
 	if err != nil {
 		h.logger.Error().Err(err).Str("startTime", startTime).Msg("Failed to parse start time")
-		h.sendMessage(chatID, common.ErrorMsgInvalidTimeFormat)
+		h.sendMessage(chatID, handlersCommon.ErrorMsgInvalidTimeFormat)
 		return
 	}
 
@@ -178,7 +180,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 	// Parse the date and combine with time
 	selectedDate, err := time.Parse("2006-01-02", date)
 	if err != nil {
-		h.sendMessage(chatID, common.ErrorMsgInvalidDateFormat)
+		h.sendMessage(chatID, handlersCommon.ErrorMsgInvalidDateFormat)
 		return
 	}
 
@@ -190,7 +192,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 
 	// Validate that start_time is in the future
 	if startDateTime.Before(util.NowInAppTimezone()) {
-		h.sendMessage(chatID, common.ErrorMsgPastTimeNotAllowed)
+		h.sendMessage(chatID, handlersCommon.ErrorMsgPastTimeNotAllowed)
 		return
 	}
 
@@ -202,9 +204,9 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 		EndTime:        endDateTime.Format(time.RFC3339),
 	}
 
-	appointment, err := h.apiService.CreateAppointment(req)
+	appointment, err := h.apiService.CreateAppointment(ctx, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCreateAppointment, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToCreateAppointment, err)
 		return
 	}
 
@@ -212,7 +214,7 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 	h.clearBookingState(user)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	text := fmt.Sprintf(common.SuccessMsgAppointmentBooked,
+	text := fmt.Sprintf(handlersCommon.SuccessMsgAppointmentBooked,
 		date, startTime, end.Format("15:04"),
 		appointment.Professional.FirstName, appointment.Professional.LastName)
 
@@ -220,13 +222,13 @@ func (h *ClientHandler) HandleTimeSelection(chatID int64, startTime string) {
 
 	// Send notification to professional
 	h.notificationService.NotifyProfessionalNewAppointment(appointment)
-	h.ShowDashboard(chatID)
+	h.ShowDashboard(ctx, chatID)
 }
 
 // HandleCancelBooking cancels the current booking process and returns to dashboard
-func (h *ClientHandler) HandleCancelBooking(chatID int64) {
+func (h *ClientHandler) HandleCancelBooking(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if in booking process
-	user, valid := h.validateUserState(chatID, []string{
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForProfessionalSelection,
 		models.StateWaitingForDateSelection,
 		models.StateWaitingForTimeSelection,
@@ -239,9 +241,9 @@ func (h *ClientHandler) HandleCancelBooking(chatID int64) {
 	// Clear all booking-related state
 	h.clearBookingState(user)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
-	id, err := h.bot.SendMessageWithID(chatID, common.ErrorMsgBookingCancelled)
+	id, err := h.bot.SendMessageWithID(chatID, handlersCommon.ErrorMsgBookingCancelled)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, handlersCommon.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	for _, messageID := range user.MessagesToDelete {
@@ -251,5 +253,5 @@ func (h *ClientHandler) HandleCancelBooking(chatID int64) {
 	user.LastMessageID = &id
 	user.MessagesToDelete = append(user.MessagesToDelete, &id)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
-	h.ShowDashboard(chatID)
+	h.ShowDashboard(ctx, chatID)
 }

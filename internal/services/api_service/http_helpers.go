@@ -1,7 +1,9 @@
 package api_service
 
 import (
+	"booking_client/internal/common"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +12,7 @@ import (
 )
 
 // makeRequest performs an HTTP request with auth header and returns the response body
-func (s *APIService) makeRequest(method, url string, body interface{}, expectedStatus int) ([]byte, error) {
+func (s *APIService) makeRequest(ctx context.Context, method, url string, body interface{}, expectedStatus int) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		jsonData, err := json.Marshal(body)
@@ -20,7 +22,7 @@ func (s *APIService) makeRequest(method, url string, body interface{}, expectedS
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, reqBody)
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -31,6 +33,11 @@ func (s *APIService) makeRequest(method, url string, body interface{}, expectedS
 
 	if err := s.addAuthHeader(req); err != nil {
 		return nil, err
+	}
+
+	// Add request ID from context
+	if requestID := common.GetRequestID(ctx); requestID != "" {
+		req.Header.Set("X-Request-ID", requestID)
 	}
 
 	resp, err := s.client.Do(req)
@@ -59,6 +66,8 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 		return fmt.Errorf("API returned status %d: %s", statusCode, strings.TrimSpace(string(body)))
 	}
 
+	fmt.Println("Error response:", errorResp.Error, errorResp.Message, errorResp.RequestID)
+
 	// Return structured error
 	return &APIError{
 		StatusCode: statusCode,
@@ -68,23 +77,9 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 	}
 }
 
-// makeGetRequest performs a GET request and unmarshals the response
-func (s *APIService) makeGetRequest(url string, result interface{}) error {
-	body, err := s.makeRequest(http.MethodGet, url, nil, http.StatusOK)
-	if err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(body, result); err != nil {
-		return fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return nil
-}
-
 // makePostRequest performs a POST request and unmarshals the response
-func (s *APIService) makePostRequest(url string, reqBody interface{}, result interface{}) error {
-	body, err := s.makeRequest(http.MethodPost, url, reqBody, http.StatusCreated)
+func (s *APIService) makePostRequest(ctx context.Context, url string, reqBody interface{}, result interface{}, expectedStatus int) error {
+	body, err := s.makeRequest(ctx, http.MethodPost, url, reqBody, expectedStatus)
 	if err != nil {
 		return err
 	}
@@ -97,10 +92,43 @@ func (s *APIService) makePostRequest(url string, reqBody interface{}, result int
 }
 
 // makePatchRequest performs a PATCH request and unmarshals the response
-func (s *APIService) makePatchRequest(url string, reqBody interface{}, result interface{}) error {
-	body, err := s.makeRequest(http.MethodPatch, url, reqBody, http.StatusOK)
+func (s *APIService) makePatchRequest(ctx context.Context, url string, reqBody interface{}, result interface{}) error {
+	body, err := s.makeRequest(ctx, http.MethodPatch, url, reqBody, http.StatusOK)
 	if err != nil {
 		return err
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// makeGetRequestWithContext performs a GET request with context and request_id header
+func (s *APIService) makeGetRequestWithContext(ctx context.Context, url string, result interface{}, requestID string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if err := s.addRequestHeaders(req, requestID); err != nil {
+		return err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return s.parseAPIError(resp.StatusCode, body)
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {

@@ -1,13 +1,15 @@
 package client
 
 import (
+	"context"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
 )
 
 // StartRegistration starts the client registration process
-func (h *ClientHandler) StartRegistration(chatID int64) {
+func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,
@@ -17,7 +19,7 @@ func (h *ClientHandler) StartRegistration(chatID int64) {
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgClientRegistration)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 
@@ -27,7 +29,7 @@ func (h *ClientHandler) StartRegistration(chatID int64) {
 }
 
 // HandleFirstNameInput handles first name input for client registration
-func (h *ClientHandler) HandleFirstNameInput(chatID int64, firstName string) {
+func (h *ClientHandler) HandleFirstNameInput(ctx context.Context, chatID int64, firstName string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -38,7 +40,7 @@ func (h *ClientHandler) HandleFirstNameInput(chatID int64, firstName string) {
 
 	id, err := h.bot.SendMessageWithID(chatID, common.SuccessMsgFirstNameSaved)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -47,7 +49,7 @@ func (h *ClientHandler) HandleFirstNameInput(chatID int64, firstName string) {
 }
 
 // HandleLastNameInput handles last name input for client registration
-func (h *ClientHandler) HandleLastNameInput(chatID int64, lastName string) {
+func (h *ClientHandler) HandleLastNameInput(ctx context.Context, chatID int64, lastName string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -58,7 +60,7 @@ func (h *ClientHandler) HandleLastNameInput(chatID int64, lastName string) {
 
 	id, err := h.bot.SendMessageWithID(chatID, common.SuccessMsgLastNameSaved)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id
@@ -67,7 +69,7 @@ func (h *ClientHandler) HandleLastNameInput(chatID int64, lastName string) {
 }
 
 // HandlePhoneInput handles phone number input for client registration
-func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
+func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phone string) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -87,9 +89,10 @@ func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
 		Role:        "client",
 	}
 
-	response, err := h.apiService.RegisterClient(req)
+	response, err := h.apiService.RegisterClient(ctx, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgRegistrationFailed, err)
+		h.apiService.GetUserRepository().DeleteUser(chatID)
+		h.sendError(ctx, chatID, common.ErrorMsgRegistrationFailed, err)
 		return
 	}
 	user.ID = response.ID
@@ -115,7 +118,7 @@ func (h *ClientHandler) HandlePhoneInput(chatID int64, phone string) {
 
 	id, err := h.bot.SendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.LastMessageID = &id

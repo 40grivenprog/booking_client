@@ -1,16 +1,18 @@
 package professional
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
 	apiService "booking_client/internal/services/api_service"
 	"booking_client/internal/util"
-	"fmt"
-	"time"
 )
 
 // HandleSetUnavailable starts the unavailable appointment setting process
-func (h *ProfessionalHandler) HandleSetUnavailable(chatID int64) {
+func (h *ProfessionalHandler) HandleSetUnavailable(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -32,8 +34,8 @@ func (h *ProfessionalHandler) showUnavailableDateSelection(chatID int64, current
 }
 
 // HandleUnavailableDateSelection handles when user selects a date for unavailable time
-func (h *ProfessionalHandler) HandleUnavailableDateSelection(chatID int64, date string) {
-	user, valid := h.validateUserState(chatID, []string{
+func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context, chatID int64, date string) {
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {
@@ -45,9 +47,9 @@ func (h *ProfessionalHandler) HandleUnavailableDateSelection(chatID int64, date 
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get availability for selected date to show time slots
-	availability, err := h.apiService.GetProfessionalAvailability(user.ID, date)
+	availability, err := h.apiService.GetProfessionalAvailability(ctx, user.ID, date)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
@@ -62,8 +64,8 @@ func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, av
 }
 
 // HandleUnavailableStartTimeSelection handles when user selects start time for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(chatID int64, startTime string) {
-	user, valid := h.validateUserState(chatID, []string{
+func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Context, chatID int64, startTime string) {
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableStartTime,
 	})
 	if !valid {
@@ -75,9 +77,9 @@ func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(chatID int64, 
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get availability for the selected date to determine available end times
-	availability, err := h.apiService.GetProfessionalAvailability(user.ID, user.SelectedDate)
+	availability, err := h.apiService.GetProfessionalAvailability(ctx, user.ID, user.SelectedDate)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToLoadAvailability, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToLoadAvailability, err)
 		return
 	}
 
@@ -133,8 +135,8 @@ func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, star
 }
 
 // HandleUnavailableEndTimeSelection handles when user selects end time for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(chatID int64, endTime string) {
-	user, valid := h.validateUserState(chatID, []string{
+func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Context, chatID int64, endTime string) {
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableEndTime,
 	})
 	if !valid {
@@ -151,8 +153,8 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(chatID int64, en
 }
 
 // HandleUnavailableDescription handles when user provides description for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, description string) {
-	user, valid := h.validateUserState(chatID, []string{
+func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, chatID int64, description string) {
+	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDescription,
 	})
 	if !valid {
@@ -185,9 +187,9 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, descrip
 		Description:    description,
 	}
 
-	appointment, err := h.apiService.CreateUnavailableAppointment(req)
+	appointment, err := h.apiService.CreateUnavailableAppointment(ctx, req)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToCreateUnavailableAppointment, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToCreateUnavailableAppointment, err)
 		return
 	}
 	// Clear state
@@ -198,11 +200,11 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(chatID int64, descrip
 		date, start.Format("15:04"), end.Format("15:04"), appointment.Appointment.Description)
 
 	h.sendMessage(chatID, text)
-	h.ShowDashboard(chatID, user)
+	h.ShowDashboard(ctx, chatID, user)
 }
 
 // HandleCancelUnavailable cancels the unavailable appointment setting process
-func (h *ProfessionalHandler) HandleCancelUnavailable(chatID int64) {
+func (h *ProfessionalHandler) HandleCancelUnavailable(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -213,13 +215,13 @@ func (h *ProfessionalHandler) HandleCancelUnavailable(chatID int64) {
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	h.sendMessage(chatID, common.ErrorMsgUnavailableCancelled)
-	h.ShowDashboard(chatID, user)
+	h.ShowDashboard(ctx, chatID, user)
 }
 
 // HandlePrevUnavailableMonth handles previous month navigation for unavailable appointments
-func (h *ProfessionalHandler) HandlePrevUnavailableMonth(chatID int64) {
+func (h *ProfessionalHandler) HandlePrevUnavailableMonth(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if waiting for unavailable date selection
-	_, valid := h.validateUserState(chatID, []string{
+	_, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {
@@ -232,9 +234,9 @@ func (h *ProfessionalHandler) HandlePrevUnavailableMonth(chatID int64) {
 }
 
 // HandleNextUnavailableMonth handles next month navigation for unavailable appointments
-func (h *ProfessionalHandler) HandleNextUnavailableMonth(chatID int64) {
+func (h *ProfessionalHandler) HandleNextUnavailableMonth(ctx context.Context, chatID int64) {
 	// Validate user state - only allow if waiting for unavailable date selection
-	_, valid := h.validateUserState(chatID, []string{
+	_, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {

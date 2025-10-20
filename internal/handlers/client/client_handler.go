@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,7 +35,7 @@ func NewClientHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *api
 }
 
 // ShowDashboard shows the client dashboard with appointment options
-func (h *ClientHandler) ShowDashboard(chatID int64) {
+func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -53,7 +54,7 @@ func (h *ClientHandler) ShowDashboard(chatID int64) {
 	}()
 	id, err := h.sendMessageWithKeyboardAndID(chatID, text, keyboard)
 	if err != nil {
-		h.sendError(chatID, common.ErrorMsgFailedToSendMessage, err)
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
 	user.MessagesToDelete = nil
