@@ -52,6 +52,7 @@ func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID in
 
 	signedInUser, err := h.apiService.SignInProfessional(ctx, req)
 	if err != nil {
+		h.apiService.GetUserRepository().DeleteUser(chatID)
 		h.sendError(ctx, chatID, common.ErrorMsgSignInFailed, err)
 		return
 	}

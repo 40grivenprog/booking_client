@@ -91,6 +91,7 @@ func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phon
 
 	response, err := h.apiService.RegisterClient(ctx, req)
 	if err != nil {
+		h.apiService.GetUserRepository().DeleteUser(chatID)
 		h.sendError(ctx, chatID, common.ErrorMsgRegistrationFailed, err)
 		return
 	}

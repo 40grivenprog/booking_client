@@ -2,6 +2,7 @@ package api_service
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 
 	"booking_client/internal/common"
@@ -13,7 +14,7 @@ func (s *APIService) RegisterClient(ctx context.Context, req *RegisterRequest) (
 	url := s.buildURL("api", "clients", "register")
 
 	var response models.ClientRegisterResponse
-	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response, http.StatusCreated); err != nil {
 		return nil, err
 	}
 

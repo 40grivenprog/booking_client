@@ -12,7 +12,7 @@ import (
 
 // sendError sends an error message to the user
 func (h *ClientHandler) sendError(ctx context.Context, chatID int64, message string, err error) {
-	text := fmt.Sprintf(message, err)
+	text := fmt.Sprintf(message, err.Error())
 	if err := h.bot.SendMessage(chatID, text); err != nil {
 		logger := common.GetLogger(ctx)
 		logger.Error().Err(err).Msg("Failed to send error message")

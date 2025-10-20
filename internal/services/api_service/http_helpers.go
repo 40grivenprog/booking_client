@@ -1,6 +1,7 @@
 package api_service
 
 import (
+	"booking_client/internal/common"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -34,6 +35,11 @@ func (s *APIService) makeRequest(ctx context.Context, method, url string, body i
 		return nil, err
 	}
 
+	// Add request ID from context
+	if requestID := common.GetRequestID(ctx); requestID != "" {
+		req.Header.Set("X-Request-ID", requestID)
+	}
+
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
@@ -60,6 +66,8 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 		return fmt.Errorf("API returned status %d: %s", statusCode, strings.TrimSpace(string(body)))
 	}
 
+	fmt.Println("Error response:", errorResp.Error, errorResp.Message, errorResp.RequestID)
+
 	// Return structured error
 	return &APIError{
 		StatusCode: statusCode,
@@ -70,8 +78,8 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 }
 
 // makePostRequest performs a POST request and unmarshals the response
-func (s *APIService) makePostRequest(ctx context.Context, url string, reqBody interface{}, result interface{}) error {
-	body, err := s.makeRequest(ctx, http.MethodPost, url, reqBody, http.StatusCreated)
+func (s *APIService) makePostRequest(ctx context.Context, url string, reqBody interface{}, result interface{}, expectedStatus int) error {
+	body, err := s.makeRequest(ctx, http.MethodPost, url, reqBody, expectedStatus)
 	if err != nil {
 		return err
 	}

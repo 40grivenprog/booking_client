@@ -2,6 +2,7 @@ package api_service
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 
 	"booking_client/internal/common"
@@ -16,7 +17,7 @@ func (s *APIService) RegisterProfessional(ctx context.Context, req *RegisterRequ
 		User models.User `json:"user"`
 	}
 
-	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response, http.StatusCreated); err != nil {
 		return nil, err
 	}
 
@@ -35,7 +36,7 @@ func (s *APIService) SignInProfessional(ctx context.Context, req *ProfessionalSi
 		User models.User `json:"user"`
 	}
 
-	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response, http.StatusOK); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +141,7 @@ func (s *APIService) CreateUnavailableAppointment(ctx context.Context, req *Crea
 	url := s.buildURL("api", "professionals", req.ProfessionalID, "unavailable_appointments")
 
 	var response models.CreateUnavailableAppointmentResponse
-	if err := s.makePostRequest(ctx, url, req, &response); err != nil {
+	if err := s.makePostRequest(ctx, url, req, &response, http.StatusCreated); err != nil {
 		return nil, err
 	}
 

@@ -2,20 +2,20 @@ package common
 
 // Error messages
 const (
-	ErrorMsgRegistrationFailed               = "❌ Registration failed: %v"
-	ErrorMsgFailedToLoadProfessionals        = "❌ Failed to load professionals: %v"
+	ErrorMsgRegistrationFailed               = "❌ Registration failed: %s"
+	ErrorMsgFailedToLoadProfessionals        = "❌ Failed to load professionals: %s"
 	ErrorMsgNoProfessionals                  = "❌ No professionals available at the moment."
-	ErrorMsgFailedToLoadAvailability         = "❌ Failed to load availability: %v"
+	ErrorMsgFailedToLoadAvailability         = "❌ Failed to load availability: %s"
 	ErrorMsgInvalidTimeFormat                = "❌ Invalid time format"
 	ErrorMsgInvalidDateFormat                = "❌ Invalid date format"
 	ErrorMsgPastTimeNotAllowed               = "❌ Cannot book appointments in the past. Please select a future time."
-	ErrorMsgFailedToCreateAppointment        = "❌ Failed to create appointment: %v"
-	ErrorMsgFailedToLoadPendingAppointments  = "❌ Failed to load pending appointments: %v"
-	ErrorMsgFailedToLoadUpcomingAppointments = "❌ Failed to load upcoming appointments: %v"
-	ErrorMsgFailedToCancelAppointment        = "❌ Failed to cancel appointment: %v"
+	ErrorMsgFailedToCreateAppointment        = "❌ Failed to create appointment: %s"
+	ErrorMsgFailedToLoadPendingAppointments  = "❌ Failed to load pending appointments: %s"
+	ErrorMsgFailedToLoadUpcomingAppointments = "❌ Failed to load upcoming appointments: %s"
+	ErrorMsgFailedToCancelAppointment        = "❌ Failed to cancel appointment: %s"
 	ErrorMsgInvalidState                     = "❌ This action is not available in your current state. Please use /start to begin a new session."
 	ErrorMsgBookingCancelled                 = "❌ Booking cancelled. Returning to dashboard."
-	ErrorMsgFailedToSendMessage              = "❌ Failed to send message: %v"
+	ErrorMsgFailedToSendMessage              = "❌ Failed to send message: %w"
 )
 
 // Success messages
@@ -62,10 +62,10 @@ const (
 
 // Professional-specific error messages
 const (
-	ErrorMsgSignInFailed                         = "❌ Sign in failed: %v"
-	ErrorMsgFailedToConfirmAppointment           = "❌ Failed to confirm appointment: %v"
-	ErrorMsgFailedToLoadAppointments             = "❌ Failed to load appointments: %v"
-	ErrorMsgFailedToCreateUnavailableAppointment = "❌ Failed to create unavailable appointment: %v"
+	ErrorMsgSignInFailed                         = "❌ Sign in failed: %s"
+	ErrorMsgFailedToConfirmAppointment           = "❌ Failed to confirm appointment: %s"
+	ErrorMsgFailedToLoadAppointments             = "❌ Failed to load appointments: %s"
+	ErrorMsgFailedToCreateUnavailableAppointment = "❌ Failed to create unavailable appointment: %s"
 	ErrorMsgUnavailableCancelled                 = "❌ Unavailable appointment setting cancelled. Returning to dashboard."
 )
 
