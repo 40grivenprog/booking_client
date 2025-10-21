@@ -66,8 +66,6 @@ func (s *APIService) parseAPIError(statusCode int, body []byte) error {
 		return fmt.Errorf("API returned status %d: %s", statusCode, strings.TrimSpace(string(body)))
 	}
 
-	fmt.Println("Error response:", errorResp.Error, errorResp.Message, errorResp.RequestID)
-
 	// Return structured error
 	return &APIError{
 		StatusCode: statusCode,
@@ -105,7 +103,7 @@ func (s *APIService) makePatchRequest(ctx context.Context, url string, reqBody i
 	return nil
 }
 
-// makeGetRequestWithContext performs a GET request with context and request_id header
+// makeGetRequestWithContext performs a GET request
 func (s *APIService) makeGetRequestWithContext(ctx context.Context, url string, result interface{}, requestID string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
