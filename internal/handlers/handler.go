@@ -98,9 +98,11 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 		Msg("Received message from user")
 
 	// Handle different commands and states
-	switch {
-	case text == "/start":
+	switch text {
+	case "/start":
 		h.handleStart(ctx, chatID)
+	case "/dashboard":
+		h.handleDashboard(ctx, chatID)
 	default:
 		h.handleUserInput(ctx, chatID, text)
 	}
@@ -296,6 +298,25 @@ Please choose how you want to continue:`
 	if err := h.bot.SendMessageWithKeyboard(chatID, welcomeText, keyboard); err != nil {
 		logger := common.GetLogger(ctx)
 		logger.Error().Err(err).Msg("Failed to send start message")
+	}
+}
+
+// handleStart handles the /dashboard command
+func (h *Handler) handleDashboard(ctx context.Context, chatID int64) {
+	user, exists := h.apiService.GetUserRepository().GetUser(chatID)
+	if !exists || user == nil {
+		text := "❌ User session not found. Please use /start to begin."
+		if err := h.bot.SendMessage(chatID, text); err != nil {
+			// Use base logger for system errors in callback registration
+			h.logger.Error().Err(err).Msg("Failed to send user not found message")
+		}
+		return
+	}
+	// Show appropriate dashboard based on user role
+	if user.Role == "professional" {
+		h.professionalHandler.ShowDashboard(ctx, chatID, user)
+	} else {
+		h.clientHandler.ShowDashboard(ctx, chatID)
 	}
 }
 

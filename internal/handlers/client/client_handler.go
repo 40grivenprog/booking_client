@@ -47,7 +47,7 @@ func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
 	keyboard := h.createDashboardKeyboard()
 	messageIDs := append([]*int{}, user.MessagesToDelete...)
 	go func() {
-		time.Sleep(1 * time.Second)
+		time.Sleep(3 * time.Second)
 		for _, messageID := range messageIDs {
 			h.bot.DeleteMessage(chatID, *messageID)
 		}
@@ -57,7 +57,7 @@ func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
 		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
 		return
 	}
-	user.MessagesToDelete = nil
+	user.MessagesToDelete = append(user.MessagesToDelete, &id)
 	user.LastMessageID = &id
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 }

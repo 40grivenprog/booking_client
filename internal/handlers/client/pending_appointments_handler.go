@@ -20,7 +20,14 @@ func (h *ClientHandler) HandlePendingAppointments(ctx context.Context, chatID in
 	}
 
 	if len(appointments.Appointments) == 0 {
-		h.sendMessage(chatID, common.UIMsgNoPendingAppointments)
+		id, err := h.sendMessageWithID(chatID, common.UIMsgNoPendingAppointments)
+		if err != nil {
+			h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
+			return
+		}
+		user.LastMessageID = &id
+		user.MessagesToDelete = append(user.MessagesToDelete, &id)
+		h.apiService.GetUserRepository().SetUser(chatID, user)
 		h.ShowDashboard(ctx, chatID)
 		return
 	}
