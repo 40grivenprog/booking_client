@@ -48,12 +48,8 @@ func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *mod
 			tgbotapi.NewInlineKeyboardButtonData(BtnBackToDashboard, "back_to_dashboard"),
 		),
 	)
-	id, err := ns.bot.SendMessageWithKeyboardAndID(appointment.Professional.ChatID, text, keyboard)
-	if err != nil {
-		ns.logger.Error().Err(err).Msg("Failed to send professional notification")
-	}
+	ns.bot.SendMessageWithKeyboard(appointment.Professional.ChatID, text, keyboard)
 
-	currentUser.LastMessageID = &id
 	ns.apiService.GetUserRepository().SetUser(appointment.Professional.ChatID, currentUser)
 }
 
