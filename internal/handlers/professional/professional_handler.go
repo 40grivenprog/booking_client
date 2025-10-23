@@ -2,6 +2,7 @@ package professional
 
 import (
 	"context"
+	"time"
 
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/handlers/keyboards"
@@ -39,8 +40,20 @@ func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, u
 	if !ok {
 		return
 	}
+	currentUser.LastMessageID = &messageID
+	currentUser.MessagesToDelete = append(currentUser.MessagesToDelete, &messageID)
 	currentUser.State = models.StateNone
+	messageIDs := append([]*int{}, user.MessagesToDelete...)
 	h.apiService.GetUserRepository().SetUser(chatID, currentUser)
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		for _, messageID := range messageIDs {
+			if messageID != nil {
+				h.bot.DeleteMessage(chatID, *messageID)
+			}
+		}
+	}()
 
 	text := fmt.Sprintf(common.UIMsgWelcomeBackProfessional, currentUser.LastName, currentUser.Role)
 	keyboard := h.createProfessionalDashboardKeyboard()

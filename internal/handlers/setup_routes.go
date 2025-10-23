@@ -45,11 +45,11 @@ func (h *Handler) setupRoutes() {
 	})
 
 	// Unavailable navigation
-	h.callbackRouter.RegisterExact(handlersCommon.CallbackPrevUnavailableMonth, func(ctx context.Context, chatID int64, _ string, messageID int) {
-		h.professionalHandler.HandlePrevUnavailableMonth(ctx, chatID, messageID)
+	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixPrevUnavailableMonth, func(ctx context.Context, chatID int64, month string, messageID int) {
+		h.professionalHandler.HandleUnavailableMonthNavigation(ctx, chatID, month, handlersCommon.DirectionPrev, messageID)
 	})
-	h.callbackRouter.RegisterExact(handlersCommon.CallbackNextUnavailableMonth, func(ctx context.Context, chatID int64, _ string, messageID int) {
-		h.professionalHandler.HandleNextUnavailableMonth(ctx, chatID, messageID)
+	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixNextUnavailableMonth, func(ctx context.Context, chatID int64, month string, messageID int) {
+		h.professionalHandler.HandleUnavailableMonthNavigation(ctx, chatID, month, handlersCommon.DirectionNext, messageID)
 	})
 	h.callbackRouter.RegisterExact(handlersCommon.CallbackCancelUnavailable, func(ctx context.Context, chatID int64, _ string, messageID int) {
 		h.professionalHandler.HandleCancelUnavailable(ctx, chatID, messageID)

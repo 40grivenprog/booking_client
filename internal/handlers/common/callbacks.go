@@ -25,9 +25,9 @@ const (
 	CallbackSetUnavailable                   = "set_unavailable"
 
 	// Unavailable navigation
-	CallbackPrevUnavailableMonth = "prev_unavailable_month"
-	CallbackNextUnavailableMonth = "next_unavailable_month"
-	CallbackCancelUnavailable    = "cancel_unavailable"
+	CallbackPrefixPrevUnavailableMonth = "prev_unavailable_month_"
+	CallbackPrefixNextUnavailableMonth = "next_unavailable_month_"
+	CallbackCancelUnavailable          = "cancel_unavailable"
 
 	// Common
 	CallbackBackToDashboard = "back_to_dashboard"

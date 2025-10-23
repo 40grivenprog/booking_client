@@ -16,6 +16,12 @@ func (h *ProfessionalHandler) HandleTimetable(ctx context.Context, chatID int64,
 		return
 	}
 
+	// Delete message for dashboard
+	go func() {
+		time.Sleep(1 * time.Second)
+		h.bot.DeleteMessage(chatID, messageID)
+	}()
+
 	currentDate := time.Now().Format("2006-01-02")
 	h.showTimetable(ctx, chatID, user, currentDate)
 }
@@ -51,6 +57,7 @@ func (h *ProfessionalHandler) HandleTimetableDateNavigation(ctx context.Context,
 	if !ok {
 		return
 	}
+	h.bot.DeleteMessage(chatID, messageID)
 
 	currentDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {

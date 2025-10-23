@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"booking_client/pkg/telegram"
+
 	"github.com/rs/zerolog"
 )
 
@@ -21,14 +23,16 @@ type CallbackRouter struct {
 	exactHandlers  map[string]CallbackHandler
 	prefixHandlers []PrefixHandler
 	logger         *zerolog.Logger
+	bot            *telegram.Bot
 }
 
 // NewCallbackRouter creates a new callback router
-func NewCallbackRouter(logger *zerolog.Logger) *CallbackRouter {
+func NewCallbackRouter(logger *zerolog.Logger, bot *telegram.Bot) *CallbackRouter {
 	return &CallbackRouter{
 		exactHandlers:  make(map[string]CallbackHandler),
 		prefixHandlers: []PrefixHandler{},
 		logger:         logger,
+		bot:            bot,
 	}
 }
 

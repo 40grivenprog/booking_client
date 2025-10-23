@@ -113,6 +113,7 @@ func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(ctx context.Contex
 	if !ok {
 		return
 	}
+	h.bot.DeleteMessage(chatID, messageID)
 
 	// Parse current month
 	currentMonth, err := time.Parse("2006-01", monthStr)
@@ -135,9 +136,6 @@ func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(ctx context.Contex
 		h.sendError(ctx, chatID, handlersCommon.ErrorMsgInvalidDateFormat, err)
 		return
 	}
-	h.bot.DeleteMessage(chatID, *user.LastMessageID)
-	user.LastMessageID = nil
-	h.apiService.GetUserRepository().SetUser(chatID, user)
 	h.showDateSelection(ctx, user, newMonthTime)
 }
 

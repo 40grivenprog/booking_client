@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"time"
 
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
@@ -19,13 +18,8 @@ func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int6
 	}
 	user.State = models.StateWaitingForCancellationReason
 	user.SelectedAppointmentID = appointmentID
-	h.apiService.GetUserRepository().SetUser(chatID, user)
-
-	// Delete message for dashboard
-	go func() {
-		time.Sleep(1 * time.Second)
-		h.bot.DeleteMessage(chatID, messageID)
-	}()
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgCancellationReason)
 	if err != nil {

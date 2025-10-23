@@ -43,7 +43,7 @@ func NewHandler(bot *telegram.Bot, config *config.Config, logger *zerolog.Logger
 		apiService:          apiService,
 		clientHandler:       client.NewClientHandler(bot, logger, apiService),
 		professionalHandler: professional.NewProfessionalHandler(bot, logger, apiService),
-		callbackRouter:      router.NewCallbackRouter(logger),
+		callbackRouter:      router.NewCallbackRouter(logger, bot),
 	}
 
 	// Setup callback routes
@@ -208,9 +208,9 @@ func (h *Handler) handleUserInput(ctx context.Context, chatID int64, text string
 	case models.StateWaitingForPhone:
 		h.clientHandler.HandlePhoneInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForUsername:
-		h.professionalHandler.HandleUsernameInput(ctx, chatID, text)
+		h.professionalHandler.HandleUsernameInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForPassword:
-		h.professionalHandler.HandlePasswordInput(ctx, chatID, text)
+		h.professionalHandler.HandlePasswordInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForCancellationReason:
 		// Check if user is professional or client to handle cancellation appropriately
 		user, exists := h.apiService.GetUserRepository().GetUser(chatID)
@@ -220,12 +220,12 @@ func (h *Handler) handleUserInput(ctx context.Context, chatID int64, text string
 		}
 
 		if user.Role == "professional" {
-			h.professionalHandler.HandleCancellationReason(ctx, chatID, text)
+			h.professionalHandler.HandleCancellationReason(ctx, chatID, text, messageID)
 		} else {
 			h.clientHandler.HandleCancellationReason(ctx, chatID, text, messageID)
 		}
 	case models.StateWaitingForUnavailableDescription:
-		h.professionalHandler.HandleUnavailableDescription(ctx, chatID, text, 0)
+		h.professionalHandler.HandleUnavailableDescription(ctx, chatID, text, messageID)
 	default:
 		h.sendUnknownCommand(ctx, chatID)
 	}

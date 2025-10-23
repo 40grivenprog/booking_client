@@ -16,6 +16,12 @@ func (h *ProfessionalHandler) HandleUpcomingAppointments(ctx context.Context, ch
 		return
 	}
 
+	// Delete message for dashboard
+	go func() {
+		time.Sleep(1 * time.Second)
+		h.bot.DeleteMessage(chatID, messageID)
+	}()
+
 	h.showUpcomingAppointmentsDatePicker(ctx, chatID, user)
 }
 
@@ -45,6 +51,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(ctx cont
 	if !ok {
 		return
 	}
+	h.bot.DeleteMessage(chatID, messageID)
 
 	currentMonth, err := time.Parse("2006-01", monthStr)
 	if err != nil {
@@ -68,6 +75,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx contex
 	if !ok {
 		return
 	}
+	h.bot.DeleteMessage(chatID, messageID)
 
 	appointments, err := h.apiService.GetProfessionalAppointmentsByDate(ctx, user.ID, "confirmed", dateStr)
 	if err != nil {
