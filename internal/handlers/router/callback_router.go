@@ -7,8 +7,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// CallbackHandler is a function that handles a callback with a parameter
-type CallbackHandler func(ctx context.Context, chatID int64, param string)
+// CallbackHandler is a function that handles a callback with a parameter and messageID
+type CallbackHandler func(ctx context.Context, chatID int64, param string, messageID int)
 
 // PrefixHandler holds a prefix and its associated handler
 type PrefixHandler struct {
@@ -50,14 +50,14 @@ func (r *CallbackRouter) RegisterPrefix(prefix string, handler CallbackHandler) 
 
 // Route routes the callback to the appropriate handler
 // Returns true if a handler was found and executed, false otherwise
-func (r *CallbackRouter) Route(ctx context.Context, chatID int64, callbackData string) bool {
+func (r *CallbackRouter) Route(ctx context.Context, chatID int64, callbackData string, messageID int) bool {
 	// Try exact match first (most common case)
 	if handler, exists := r.exactHandlers[callbackData]; exists {
 		r.logger.Debug().
 			Int64("chat_id", chatID).
 			Str("callback", callbackData).
 			Msg("Routing to exact handler")
-		handler(ctx, chatID, "")
+		handler(ctx, chatID, "", messageID)
 		return true
 	}
 
@@ -70,7 +70,7 @@ func (r *CallbackRouter) Route(ctx context.Context, chatID int64, callbackData s
 				Str("prefix", ph.Prefix).
 				Str("param", param).
 				Msg("Routing to prefix handler")
-			ph.Handler(ctx, chatID, param)
+			ph.Handler(ctx, chatID, param, messageID)
 			return true
 		}
 	}

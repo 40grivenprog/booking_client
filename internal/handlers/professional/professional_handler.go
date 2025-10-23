@@ -34,7 +34,7 @@ func NewProfessionalHandler(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 }
 
 // ShowDashboard shows the professional dashboard with appointment options
-func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, user *models.User) {
+func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, user *models.User, messageID int) {
 	currentUser, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -49,7 +49,7 @@ func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, u
 }
 
 // ShowDashboardWithEdit shows the professional dashboard by editing the last message
-func (h *ProfessionalHandler) ShowDashboardWithEdit(chatID int64, user *models.User) {
+func (h *ProfessionalHandler) ShowDashboardWithEdit(chatID int64, user *models.User, messageID int) {
 	currentUser, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return

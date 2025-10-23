@@ -8,7 +8,7 @@ import (
 )
 
 // HandleCancelAppointment starts the professional appointment cancellation process
-func (h *ProfessionalHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string) {
+func (h *ProfessionalHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -61,5 +61,5 @@ func (h *ProfessionalHandler) HandleCancellationReason(ctx context.Context, chat
 
 	// Notify client about cancellation
 	h.notificationService.NotifyClientProfessionalCancellation(response)
-	h.ShowDashboard(ctx, chatID, user)
+	h.ShowDashboard(ctx, chatID, user, 0)
 }

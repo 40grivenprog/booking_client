@@ -8,7 +8,7 @@ import (
 )
 
 // HandleConfirmAppointment handles professional appointment confirmation
-func (h *ProfessionalHandler) HandleConfirmAppointment(ctx context.Context, chatID int64, appointmentID string) {
+func (h *ProfessionalHandler) HandleConfirmAppointment(ctx context.Context, chatID int64, appointmentID string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return

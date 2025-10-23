@@ -35,11 +35,13 @@ func NewClientHandler(bot *telegram.Bot, logger *zerolog.Logger, apiService *api
 }
 
 // ShowDashboard shows the client dashboard with appointment options
-func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
+func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	user.State = models.StateNone
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
@@ -47,7 +49,7 @@ func (h *ClientHandler) ShowDashboard(ctx context.Context, chatID int64) {
 	keyboard := h.createDashboardKeyboard()
 	messageIDs := append([]*int{}, user.MessagesToDelete...)
 	go func() {
-		time.Sleep(3 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		for _, messageID := range messageIDs {
 			h.bot.DeleteMessage(chatID, *messageID)
 		}

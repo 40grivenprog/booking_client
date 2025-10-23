@@ -7,7 +7,7 @@ import (
 )
 
 // HandlePendingAppointments shows pending appointments for professionals
-func (h *ProfessionalHandler) HandlePendingAppointments(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) HandlePendingAppointments(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -21,7 +21,7 @@ func (h *ProfessionalHandler) HandlePendingAppointments(ctx context.Context, cha
 
 	if len(appointments.Appointments) == 0 {
 		h.sendMessage(chatID, common.UIMsgNoPendingAppointments)
-		h.ShowDashboard(ctx, chatID, user)
+		h.ShowDashboard(ctx, chatID, user, 0)
 		return
 	}
 

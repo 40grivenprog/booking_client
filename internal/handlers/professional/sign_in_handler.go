@@ -9,7 +9,7 @@ import (
 )
 
 // StartSignIn starts the professional sign-in process
-func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64, messageID int) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,
@@ -71,5 +71,5 @@ func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID in
 		Build()
 
 	h.sendMessage(chatID, text)
-	h.ShowDashboard(ctx, chatID, signedInUser)
+	h.ShowDashboard(ctx, chatID, signedInUser, 0)
 }

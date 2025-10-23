@@ -9,7 +9,7 @@ import (
 )
 
 // StartRegistration starts the client registration process
-func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64) {
+func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64, messageID int) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,

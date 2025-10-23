@@ -10,7 +10,7 @@ import (
 )
 
 // HandleTimetable shows the professional's timetable for the current date
-func (h *ProfessionalHandler) HandleTimetable(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) HandleTimetable(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -46,7 +46,7 @@ func (h *ProfessionalHandler) showTimetable(ctx context.Context, chatID int64, u
 }
 
 // HandleTimetableDateNavigation handles timetable date navigation
-func (h *ProfessionalHandler) HandleTimetableDateNavigation(ctx context.Context, chatID int64, dateStr string, direction string) {
+func (h *ProfessionalHandler) HandleTimetableDateNavigation(ctx context.Context, chatID int64, dateStr string, direction string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return

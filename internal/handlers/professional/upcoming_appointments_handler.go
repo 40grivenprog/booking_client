@@ -10,7 +10,7 @@ import (
 )
 
 // HandleUpcomingAppointments shows upcoming appointments for professionals
-func (h *ProfessionalHandler) HandleUpcomingAppointments(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) HandleUpcomingAppointments(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -40,7 +40,7 @@ func (h *ProfessionalHandler) showUpcomingAppointmentsDatePicker(ctx context.Con
 }
 
 // HandleUpcomingAppointmentsMonthNavigation handles month navigation for upcoming appointments
-func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(ctx context.Context, chatID int64, monthStr string, direction string) {
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(ctx context.Context, chatID int64, monthStr string, direction string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -63,7 +63,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsMonthNavigation(ctx cont
 }
 
 // HandleUpcomingAppointmentsDateSelection handles date selection from upcoming appointments picker
-func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx context.Context, chatID int64, dateStr string) {
+func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx context.Context, chatID int64, dateStr string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -77,7 +77,7 @@ func (h *ProfessionalHandler) HandleUpcomingAppointmentsDateSelection(ctx contex
 
 	if len(appointments.Appointments) == 0 {
 		h.sendMessage(chatID, common.UIMsgNoUpcomingAppointments)
-		h.ShowDashboard(ctx, chatID, user)
+		h.ShowDashboard(ctx, chatID, user, 0)
 		return
 	}
 
