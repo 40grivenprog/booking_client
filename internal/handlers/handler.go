@@ -99,7 +99,7 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 	// Handle different commands and states
 	switch text {
 	case "/start":
-		h.handleStart(ctx, chatID)
+		h.handleStart(ctx, chatID, message.MessageID)
 	case "/dashboard":
 		h.handleDashboard(ctx, chatID)
 	default:
@@ -141,15 +141,15 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 }
 
 // handleStart handles the /start command
-func (h *Handler) handleStart(ctx context.Context, chatID int64) {
+func (h *Handler) handleStart(ctx context.Context, chatID int64, messageID int) {
 	// Check if user is already registered
 	user, err := h.apiService.GetUserByChatID(ctx, chatID)
 	if err == nil && user != nil {
 		// User is already registered, show appropriate dashboard
 		if user.Role == "professional" {
-			h.professionalHandler.ShowDashboard(ctx, chatID, user, 0)
+			h.professionalHandler.ShowDashboard(ctx, chatID, user, messageID)
 		} else {
-			h.clientHandler.ShowDashboard(ctx, chatID, 0)
+			h.clientHandler.ShowDashboard(ctx, chatID, messageID)
 		}
 		return
 	}
@@ -202,11 +202,11 @@ func (h *Handler) handleUserInput(ctx context.Context, chatID int64, text string
 
 	switch user.State {
 	case models.StateWaitingForFirstName:
-		h.clientHandler.HandleFirstNameInput(ctx, chatID, text)
+		h.clientHandler.HandleFirstNameInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForLastName:
-		h.clientHandler.HandleLastNameInput(ctx, chatID, text)
+		h.clientHandler.HandleLastNameInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForPhone:
-		h.clientHandler.HandlePhoneInput(ctx, chatID, text)
+		h.clientHandler.HandlePhoneInput(ctx, chatID, text, messageID)
 	case models.StateWaitingForUsername:
 		h.professionalHandler.HandleUsernameInput(ctx, chatID, text)
 	case models.StateWaitingForPassword:
