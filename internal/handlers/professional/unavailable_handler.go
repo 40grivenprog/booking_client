@@ -160,7 +160,14 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Cont
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	text := fmt.Sprintf(common.UIMsgUnavailableDescription, user.SelectedDate, user.SelectedUnavailableStartTime, endTime)
-	h.sendMessage(chatID, text)
+	id, err := h.sendMessageWithID(chatID, text)
+	if err != nil {
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
+		return
+	}
+	user.LastMessageID = &id
+	user.MessagesToDelete = append(user.MessagesToDelete, &id)
+	h.apiService.GetUserRepository().SetUser(chatID, user)
 }
 
 // HandleUnavailableDescription handles when user provides description for unavailable period
