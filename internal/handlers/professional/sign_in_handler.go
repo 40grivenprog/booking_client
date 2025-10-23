@@ -9,7 +9,7 @@ import (
 )
 
 // StartSignIn starts the professional sign-in process
-func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64, messageID int) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,
@@ -24,20 +24,22 @@ func (h *ProfessionalHandler) StartSignIn(ctx context.Context, chatID int64) {
 }
 
 // HandleUsernameInput handles username input for professional sign-in
-func (h *ProfessionalHandler) HandleUsernameInput(ctx context.Context, chatID int64, username string) {
+func (h *ProfessionalHandler) HandleUsernameInput(ctx context.Context, chatID int64, username string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
 	user.Username = username
 	user.State = models.StateWaitingForPassword
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	h.sendMessage(chatID, common.SuccessMsgUsernameSaved)
 }
 
 // HandlePasswordInput handles password input for professional sign-in
-func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID int64, password string) {
+func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID int64, password string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -59,6 +61,8 @@ func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID in
 
 	// Clear state
 	user.State = models.StateNone
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, signedInUser)
 
 	// Build success message
@@ -71,5 +75,5 @@ func (h *ProfessionalHandler) HandlePasswordInput(ctx context.Context, chatID in
 		Build()
 
 	h.sendMessage(chatID, text)
-	h.ShowDashboard(ctx, chatID, signedInUser)
+	h.ShowDashboard(ctx, chatID, signedInUser, 0)
 }

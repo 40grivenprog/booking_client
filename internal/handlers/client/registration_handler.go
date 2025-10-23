@@ -9,7 +9,7 @@ import (
 )
 
 // StartRegistration starts the client registration process
-func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64) {
+func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64, messageID int) {
 	// Create a temporary user with state
 	tempUser := &models.User{
 		ChatID: &chatID,
@@ -24,12 +24,12 @@ func (h *ClientHandler) StartRegistration(ctx context.Context, chatID int64) {
 	}
 
 	tempUser.LastMessageID = &id
-	tempUser.MessagesToDelete = append(tempUser.MessagesToDelete, &id)
+	tempUser.MessagesToDelete = append(tempUser.MessagesToDelete, &id, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, tempUser)
 }
 
 // HandleFirstNameInput handles first name input for client registration
-func (h *ClientHandler) HandleFirstNameInput(ctx context.Context, chatID int64, firstName string) {
+func (h *ClientHandler) HandleFirstNameInput(ctx context.Context, chatID int64, firstName string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -44,12 +44,12 @@ func (h *ClientHandler) HandleFirstNameInput(ctx context.Context, chatID int64, 
 		return
 	}
 	user.LastMessageID = &id
-	user.MessagesToDelete = append(user.MessagesToDelete, &id)
+	user.MessagesToDelete = append(user.MessagesToDelete, &id, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 }
 
 // HandleLastNameInput handles last name input for client registration
-func (h *ClientHandler) HandleLastNameInput(ctx context.Context, chatID int64, lastName string) {
+func (h *ClientHandler) HandleLastNameInput(ctx context.Context, chatID int64, lastName string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -64,12 +64,12 @@ func (h *ClientHandler) HandleLastNameInput(ctx context.Context, chatID int64, l
 		return
 	}
 	user.LastMessageID = &id
-	user.MessagesToDelete = append(user.MessagesToDelete, &id)
+	user.MessagesToDelete = append(user.MessagesToDelete, &id, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 }
 
 // HandlePhoneInput handles phone number input for client registration
-func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phone string) {
+func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phone string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -122,6 +122,6 @@ func (h *ClientHandler) HandlePhoneInput(ctx context.Context, chatID int64, phon
 		return
 	}
 	user.LastMessageID = &id
-	user.MessagesToDelete = append(user.MessagesToDelete, &id)
+	user.MessagesToDelete = append(user.MessagesToDelete, &id, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 }

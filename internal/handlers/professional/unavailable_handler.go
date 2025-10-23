@@ -12,11 +12,16 @@ import (
 )
 
 // HandleSetUnavailable starts the unavailable appointment setting process
-func (h *ProfessionalHandler) HandleSetUnavailable(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) HandleSetUnavailable(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
+	// Delete message for dashboard
+	go func() {
+		time.Sleep(1 * time.Second)
+		h.bot.DeleteMessage(chatID, messageID)
+	}()
 
 	// Set state for unavailable appointment
 	user.State = models.StateWaitingForUnavailableDateSelection
@@ -34,7 +39,7 @@ func (h *ProfessionalHandler) showUnavailableDateSelection(chatID int64, current
 }
 
 // HandleUnavailableDateSelection handles when user selects a date for unavailable time
-func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context, chatID int64, date string) {
+func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context, chatID int64, date string, messageID int) {
 	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
@@ -44,6 +49,8 @@ func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context
 
 	user.State = models.StateWaitingForUnavailableStartTime
 	user.SelectedDate = date
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get availability for selected date to show time slots
@@ -64,7 +71,7 @@ func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, av
 }
 
 // HandleUnavailableStartTimeSelection handles when user selects start time for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Context, chatID int64, startTime string) {
+func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Context, chatID int64, startTime string, messageID int) {
 	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableStartTime,
 	})
@@ -74,6 +81,8 @@ func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Co
 
 	user.State = models.StateWaitingForUnavailableEndTime
 	user.SelectedUnavailableStartTime = startTime // Store start time temporarily
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	// Get availability for the selected date to determine available end times
@@ -135,7 +144,7 @@ func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, star
 }
 
 // HandleUnavailableEndTimeSelection handles when user selects end time for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Context, chatID int64, endTime string) {
+func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Context, chatID int64, endTime string, messageID int) {
 	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableEndTime,
 	})
@@ -146,6 +155,8 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Cont
 	// Store end time and ask for description
 	user.State = models.StateWaitingForUnavailableDescription
 	user.SelectedUnavailableEndTime = endTime
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	text := fmt.Sprintf(common.UIMsgUnavailableDescription, user.SelectedDate, user.SelectedUnavailableStartTime, endTime)
@@ -153,7 +164,7 @@ func (h *ProfessionalHandler) HandleUnavailableEndTimeSelection(ctx context.Cont
 }
 
 // HandleUnavailableDescription handles when user provides description for unavailable period
-func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, chatID int64, description string) {
+func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, chatID int64, description string, messageID int) {
 	user, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDescription,
 	})
@@ -194,17 +205,19 @@ func (h *ProfessionalHandler) HandleUnavailableDescription(ctx context.Context, 
 	}
 	// Clear state
 	h.clearUnavailableState(user)
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	text := fmt.Sprintf(common.SuccessMsgUnavailablePeriodSet,
 		date, start.Format("15:04"), end.Format("15:04"), appointment.Appointment.Description)
 
 	h.sendMessage(chatID, text)
-	h.ShowDashboard(ctx, chatID, user)
+	h.ShowDashboard(ctx, chatID, user, 0)
 }
 
 // HandleCancelUnavailable cancels the unavailable appointment setting process
-func (h *ProfessionalHandler) HandleCancelUnavailable(ctx context.Context, chatID int64) {
+func (h *ProfessionalHandler) HandleCancelUnavailable(ctx context.Context, chatID int64, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -212,38 +225,47 @@ func (h *ProfessionalHandler) HandleCancelUnavailable(ctx context.Context, chatI
 
 	// Clear all unavailable-related state
 	h.clearUnavailableState(user)
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
-	h.sendMessage(chatID, common.ErrorMsgUnavailableCancelled)
-	h.ShowDashboard(ctx, chatID, user)
+	id, err := h.bot.SendMessageWithID(chatID, common.ErrorMsgUnavailableCancelled)
+	if err != nil {
+		h.sendError(ctx, chatID, common.ErrorMsgFailedToSendMessage, err)
+		return
+	}
+	user.LastMessageID = &id
+	user.MessagesToDelete = append(user.MessagesToDelete, &id)
+	h.ShowDashboard(ctx, chatID, user, 0)
 }
 
-// HandlePrevUnavailableMonth handles previous month navigation for unavailable appointments
-func (h *ProfessionalHandler) HandlePrevUnavailableMonth(ctx context.Context, chatID int64) {
+// HandleUnavailableMonthNavigation handles month navigation for unavailable appointments
+func (h *ProfessionalHandler) HandleUnavailableMonthNavigation(ctx context.Context, chatID int64, month string, direction string, messageID int) {
 	// Validate user state - only allow if waiting for unavailable date selection
+	h.bot.DeleteMessage(chatID, messageID)
 	_, valid := h.validateUserState(ctx, chatID, []string{
 		models.StateWaitingForUnavailableDateSelection,
 	})
 	if !valid {
 		return
 	}
+	h.bot.DeleteMessage(chatID, messageID)
 
-	// For simplicity, we'll just show current month again
-	// In a real implementation, you'd store the current month in user state
-	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, -1, 0))
-}
-
-// HandleNextUnavailableMonth handles next month navigation for unavailable appointments
-func (h *ProfessionalHandler) HandleNextUnavailableMonth(ctx context.Context, chatID int64) {
-	// Validate user state - only allow if waiting for unavailable date selection
-	_, valid := h.validateUserState(ctx, chatID, []string{
-		models.StateWaitingForUnavailableDateSelection,
-	})
-	if !valid {
+	// Parse current month
+	currentMonth, err := time.Parse("2006-01", month)
+	if err != nil {
+		h.sendError(ctx, chatID, common.ErrorMsgInvalidDateFormat, err)
 		return
 	}
 
-	// For simplicity, we'll just show current month again
-	// In a real implementation, you'd store the current month in user state
-	h.showUnavailableDateSelection(chatID, time.Now().AddDate(0, 1, 0))
+	// Calculate new month based on direction
+	var newMonth time.Time
+	if direction == common.DirectionPrev {
+		newMonth = currentMonth.AddDate(0, -1, 0)
+	} else {
+		newMonth = currentMonth.AddDate(0, 1, 0)
+	}
+
+	// Show new month
+	h.showUnavailableDateSelection(chatID, newMonth)
 }

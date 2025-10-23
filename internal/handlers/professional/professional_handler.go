@@ -2,6 +2,7 @@ package professional
 
 import (
 	"context"
+	"time"
 
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/handlers/keyboards"
@@ -34,13 +35,25 @@ func NewProfessionalHandler(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 }
 
 // ShowDashboard shows the professional dashboard with appointment options
-func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, user *models.User) {
+func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, user *models.User, messageID int) {
 	currentUser, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
 	}
+	currentUser.LastMessageID = &messageID
+	currentUser.MessagesToDelete = append(currentUser.MessagesToDelete, &messageID)
 	currentUser.State = models.StateNone
+	messageIDs := append([]*int{}, user.MessagesToDelete...)
 	h.apiService.GetUserRepository().SetUser(chatID, currentUser)
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		for _, messageID := range messageIDs {
+			if messageID != nil {
+				h.bot.DeleteMessage(chatID, *messageID)
+			}
+		}
+	}()
 
 	text := fmt.Sprintf(common.UIMsgWelcomeBackProfessional, currentUser.LastName, currentUser.Role)
 	keyboard := h.createProfessionalDashboardKeyboard()
@@ -49,7 +62,7 @@ func (h *ProfessionalHandler) ShowDashboard(ctx context.Context, chatID int64, u
 }
 
 // ShowDashboardWithEdit shows the professional dashboard by editing the last message
-func (h *ProfessionalHandler) ShowDashboardWithEdit(chatID int64, user *models.User) {
+func (h *ProfessionalHandler) ShowDashboardWithEdit(chatID int64, user *models.User, messageID int) {
 	currentUser, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return

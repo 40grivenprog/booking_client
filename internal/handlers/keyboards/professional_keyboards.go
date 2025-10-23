@@ -110,9 +110,20 @@ func (kb *ProfessionalKeyboards) CreateUnavailableDateKeyboard(currentDate time.
 	}
 
 	// Add navigation buttons
-	prevButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnPreviousUnavailableMonth, "prev_unavailable_month")
-	nextButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnNextUnavailableMonth, "next_unavailable_month")
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(prevButton, nextButton))
+	currentMonth := currentDate.Format("2006-01")
+	todayMonth := today.Format("2006-01")
+
+	var navButtons []tgbotapi.InlineKeyboardButton
+
+	if currentMonth != todayMonth {
+		prevButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnPreviousUnavailableMonth, "prev_unavailable_month_"+currentMonth)
+		navButtons = append(navButtons, prevButton)
+	}
+
+	nextButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnNextUnavailableMonth, "next_unavailable_month_"+currentMonth)
+	navButtons = append(navButtons, nextButton)
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(navButtons...))
 
 	// Add cancel button
 	cancelButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnCancelUnavailable, "cancel_unavailable")
@@ -314,4 +325,3 @@ func (kb *ProfessionalKeyboards) CreateTimetableKeyboard(dateStr string, appoint
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
-

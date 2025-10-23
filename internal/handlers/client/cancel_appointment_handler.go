@@ -10,7 +10,7 @@ import (
 )
 
 // HandleCancelAppointment starts the appointment cancellation process
-func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string) {
+func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int64, appointmentID string, messageID int) {
 	// Store appointment ID and ask for cancellation reason
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
@@ -18,7 +18,8 @@ func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int6
 	}
 	user.State = models.StateWaitingForCancellationReason
 	user.SelectedAppointmentID = appointmentID
-	h.apiService.GetUserRepository().SetUser(chatID, user)
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 
 	id, err := h.bot.SendMessageWithID(chatID, common.UIMsgCancellationReason)
 	if err != nil {
@@ -31,7 +32,7 @@ func (h *ClientHandler) HandleCancelAppointment(ctx context.Context, chatID int6
 }
 
 // HandleCancellationReason handles the cancellation reason input
-func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int64, reason string) {
+func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int64, reason string, messageID int) {
 	user, ok := common.GetUserOrSendError(h.apiService.GetUserRepository(), h.bot, h.logger, chatID)
 	if !ok {
 		return
@@ -52,6 +53,8 @@ func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int
 	// Clear state
 	user.State = models.StateNone
 	user.SelectedAppointmentID = ""
+	user.LastMessageID = &messageID
+	user.MessagesToDelete = append(user.MessagesToDelete, &messageID)
 	h.apiService.GetUserRepository().SetUser(chatID, user)
 
 	date, startTime, endTime := common.FormatAppointmentTime(response.Appointment.StartTime, response.Appointment.EndTime)
@@ -64,5 +67,5 @@ func (h *ClientHandler) HandleCancellationReason(ctx context.Context, chatID int
 
 	// Notify professional about cancellation
 	h.notificationService.NotifyProfessionalCancellation(response)
-	h.ShowDashboard(ctx, chatID)
+	h.ShowDashboard(ctx, chatID, 0)
 }
