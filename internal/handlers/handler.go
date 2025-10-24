@@ -15,6 +15,7 @@ import (
 	"booking_client/pkg/telegram"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -66,6 +67,33 @@ func (h *Handler) RegisterHandlers() {
 
 // HandleUpdate processes incoming updates (implements UpdateHandler interface)
 func (h *Handler) HandleUpdate(update tgbotapi.Update) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger := h.logger
+			requestID := uuid.New().String()
+			adjustedLogger := logger.With().
+				Str("request_id", requestID).
+				Logger()
+
+			adjustedLogger.Error().
+				Interface("panic", r).
+				Msg("Panic recovered in HandleUpdate")
+
+			// Try to send error message to user if possible
+			if update.Message != nil {
+				errorMsg := "❌ An error occurred while processing your request. Please try again. Or contact support. with request ID: " + requestID
+				if err := h.bot.SendMessage(update.Message.Chat.ID, errorMsg); err != nil {
+					adjustedLogger.Error().Err(err).Msg("Failed to send error message to user")
+				}
+			} else if update.CallbackQuery != nil {
+				errorMsg := "❌ An error occurred while processing your request. Please try again. Or contact support. with request ID: " + requestID
+				if err := h.bot.SendMessage(update.CallbackQuery.Message.Chat.ID, errorMsg); err != nil {
+					adjustedLogger.Error().Err(err).Msg("Failed to send error message to user")
+				}
+			}
+		}
+	}()
+
 	start := time.Now()
 
 	// Create context with request_id and adjusted logger
