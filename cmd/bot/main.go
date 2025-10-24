@@ -40,8 +40,8 @@ func main() {
 	// Use JSON format for production logs
 	log.Logger = log.Output(os.Stdout)
 
-	// Initialize Telegram bot
-	bot, err := telegram.NewBot(cfg.TelegramToken, &log.Logger)
+	// Initialize Telegram bot with worker pool (5 workers)
+	bot, err := telegram.NewBotWithWorkers(cfg.TelegramToken, &log.Logger, 5)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Telegram bot")
 	}

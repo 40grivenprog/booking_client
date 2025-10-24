@@ -25,20 +25,26 @@ type Bot struct {
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
 	updateHandler UpdateHandler
+	workers       int
+	updateChan    chan tgbotapi.Update
 }
 
 // NewBot creates a new Telegram bot instance
 func NewBot(token string, logger *zerolog.Logger) (*Bot, error) {
-	// Create custom HTTP client with TLS configuration
-	// Note: InsecureSkipVerify is set to true to work around certificate verification issues
-	// with api.telegram.org. In production, consider using a proper certificate store
-	// or implementing custom certificate validation.
+	return NewBotWithWorkers(token, logger, 1)
+}
+
+// NewBotWithWorkers creates a new Telegram bot instance with specified number of workers
+func NewBotWithWorkers(token string, logger *zerolog.Logger, workers int) (*Bot, error) {
+	// Create secure HTTP client
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS12,
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 	}
@@ -57,10 +63,12 @@ func NewBot(token string, logger *zerolog.Logger) (*Bot, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	bot := &Bot{
-		api:    api,
-		logger: logger,
-		ctx:    ctx,
-		cancel: cancel,
+		api:        api,
+		logger:     logger,
+		ctx:        ctx,
+		cancel:     cancel,
+		workers:    workers,
+		updateChan: make(chan tgbotapi.Update, workers*10), // Buffer for workers
 	}
 
 	logger.Info().Str("username", api.Self.UserName).Msg("Authorized on account")
@@ -74,18 +82,34 @@ func (b *Bot) Start() error {
 
 	updates := b.api.GetUpdatesChan(u)
 
+	// Start update receiver
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
 		for {
 			select {
 			case <-b.ctx.Done():
+				close(b.updateChan)
 				return
 			case update := <-updates:
-				b.handleUpdate(update)
+				select {
+				case b.updateChan <- update:
+				case <-b.ctx.Done():
+					return
+				}
 			}
 		}
 	}()
+
+	// Start worker pool
+	for i := 0; i < b.workers; i++ {
+		b.wg.Add(1)
+		go b.worker(i)
+	}
+
+	b.logger.Info().
+		Int("workers", b.workers).
+		Msg("Bot started with worker pool")
 
 	return nil
 }
@@ -101,8 +125,48 @@ func (b *Bot) SetUpdateHandler(handler UpdateHandler) {
 	b.updateHandler = handler
 }
 
+// worker processes updates in a separate goroutine
+func (b *Bot) worker(id int) {
+	defer b.wg.Done()
+
+	// Panic recovery for worker
+	defer func() {
+		if r := recover(); r != nil {
+			b.logger.Error().
+				Int("worker_id", id).
+				Interface("panic", r).
+				Msg("Worker panic recovered")
+		}
+	}()
+
+	b.logger.Debug().Int("worker_id", id).Msg("Worker started")
+
+	for {
+		select {
+		case <-b.ctx.Done():
+			b.logger.Debug().Int("worker_id", id).Msg("Worker stopped")
+			return
+		case update, ok := <-b.updateChan:
+			if !ok {
+				b.logger.Debug().Int("worker_id", id).Msg("Update channel closed, worker stopping")
+				return
+			}
+			b.handleUpdate(update)
+		}
+	}
+}
+
 // handleUpdate processes incoming updates
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	// Panic recovery for individual update processing
+	defer func() {
+		if r := recover(); r != nil {
+			b.logger.Error().
+				Interface("panic", r).
+				Msg("Panic recovered in handleUpdate")
+		}
+	}()
+
 	if b.updateHandler != nil {
 		b.updateHandler.HandleUpdate(update)
 	} else if update.Message != nil {
