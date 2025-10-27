@@ -3,7 +3,7 @@ package common
 import (
 	"fmt"
 
-	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	apiService "booking_client/internal/services/api_service"
 	"booking_client/pkg/telegram"
 
@@ -28,7 +28,7 @@ func NewNotificationService(bot *telegram.Bot, logger *zerolog.Logger, apiServic
 }
 
 // NotifyProfessionalNewAppointment sends notification to professional about new appointment
-func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *models.CreateAppointmentResponse) {
+func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *schemas.CreateAppointmentResponse) {
 	currentUser, ok := GetUserOrSendError(ns.apiService.GetUserRepository(), ns.bot, ns.logger, appointment.Professional.ChatID)
 	if !ok {
 		return
@@ -54,7 +54,7 @@ func (ns *NotificationService) NotifyProfessionalNewAppointment(appointment *mod
 }
 
 // NotifyProfessionalCancellation sends notification to professional about appointment cancellation
-func (ns *NotificationService) NotifyProfessionalCancellation(response *models.CancelClientAppointmentResponse) {
+func (ns *NotificationService) NotifyProfessionalCancellation(response *schemas.CancelClientAppointmentResponse) {
 	if response.Professional.ChatID == nil || *response.Professional.ChatID == 0 {
 		return // No chat ID for professional
 	}
@@ -72,7 +72,7 @@ func (ns *NotificationService) NotifyProfessionalCancellation(response *models.C
 }
 
 // NotifyClientAppointmentConfirmation sends notification to client about appointment confirmation
-func (ns *NotificationService) NotifyClientAppointmentConfirmation(response *models.ConfirmProfessionalAppointmentResponse) {
+func (ns *NotificationService) NotifyClientAppointmentConfirmation(response *schemas.ConfirmProfessionalAppointmentResponse) {
 	if response.Client.ChatID == nil || *response.Client.ChatID == 0 {
 		return // No chat ID for client
 	}
@@ -89,7 +89,7 @@ func (ns *NotificationService) NotifyClientAppointmentConfirmation(response *mod
 }
 
 // NotifyClientProfessionalCancellation sends notification to client about appointment cancellation by professional
-func (ns *NotificationService) NotifyClientProfessionalCancellation(response *models.CancelProfessionalAppointmentResponse) {
+func (ns *NotificationService) NotifyClientProfessionalCancellation(response *schemas.CancelProfessionalAppointmentResponse) {
 	if response.Client.ChatID == nil || *response.Client.ChatID == 0 {
 		return // No chat ID for client
 	}

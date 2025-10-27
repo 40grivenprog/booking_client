@@ -6,14 +6,14 @@ import (
 	"net/url"
 
 	"booking_client/internal/common"
-	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 )
 
 // RegisterClient registers a new client
-func (s *APIService) RegisterClient(ctx context.Context, req *RegisterRequest) (*models.ClientRegisterResponse, error) {
+func (s *APIService) RegisterClient(ctx context.Context, req *RegisterRequest) (*schemas.ClientRegisterResponse, error) {
 	url := s.buildURL("api", "clients", "register")
 
-	var response models.ClientRegisterResponse
+	var response schemas.ClientRegisterResponse
 	if err := s.makePostRequest(ctx, url, req, &response, http.StatusCreated); err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func (s *APIService) RegisterClient(ctx context.Context, req *RegisterRequest) (
 }
 
 // GetClientAppointments retrieves client appointments with optional status filter
-func (s *APIService) GetClientAppointments(ctx context.Context, clientID, status string) (*models.GetClientAppointmentsResponse, error) {
+func (s *APIService) GetClientAppointments(ctx context.Context, clientID, status string) (*schemas.GetClientAppointmentsResponse, error) {
 	query := url.Values{}
 	if status != "" {
 		query.Set("status", status)
@@ -32,7 +32,7 @@ func (s *APIService) GetClientAppointments(ctx context.Context, clientID, status
 
 	url := s.buildURLWithQuery([]string{"api", "clients", clientID, "appointments"}, query)
 
-	var response models.GetClientAppointmentsResponse
+	var response schemas.GetClientAppointmentsResponse
 	requestID := common.GetRequestID(ctx)
 	if err := s.makeGetRequestWithContext(ctx, url, &response, requestID); err != nil {
 		return nil, err
@@ -42,10 +42,10 @@ func (s *APIService) GetClientAppointments(ctx context.Context, clientID, status
 }
 
 // CancelClientAppointment cancels an appointment by client
-func (s *APIService) CancelClientAppointment(ctx context.Context, clientID, appointmentID string, req *CancelAppointmentRequest) (*models.CancelClientAppointmentResponse, error) {
+func (s *APIService) CancelClientAppointment(ctx context.Context, clientID, appointmentID string, req *CancelAppointmentRequest) (*schemas.CancelClientAppointmentResponse, error) {
 	url := s.buildURL("api", "clients", clientID, "appointments", appointmentID, "cancel")
 
-	var response models.CancelClientAppointmentResponse
+	var response schemas.CancelClientAppointmentResponse
 	if err := s.makePatchRequest(ctx, url, req, &response); err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package keyboards
 import (
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	"booking_client/internal/util"
 	"fmt"
 	"time"
@@ -80,7 +81,7 @@ func (kb *ClientKeyboards) CreateDateKeyboard(currentDate time.Time) tgbotapi.In
 }
 
 // CreateTimeKeyboard creates a keyboard for time slot selection
-func (kb *ClientKeyboards) CreateTimeKeyboard(availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (kb *ClientKeyboards) CreateTimeKeyboard(availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	var currentRow []tgbotapi.InlineKeyboardButton
 
@@ -142,7 +143,7 @@ func (kb *ClientKeyboards) CreateProfessionalsKeyboard(professionals []models.Us
 }
 
 // CreateAppointmentsKeyboard creates a keyboard for appointment management
-func (kb *ClientKeyboards) CreateAppointmentsKeyboard(appointments []models.ClientAppointment, buttonPrefix string) tgbotapi.InlineKeyboardMarkup {
+func (kb *ClientKeyboards) CreateAppointmentsKeyboard(appointments []schemas.ClientAppointment, buttonPrefix string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments {

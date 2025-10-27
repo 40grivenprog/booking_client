@@ -5,6 +5,7 @@ import (
 
 	handlersCommon "booking_client/internal/handlers/common"
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	apiService "booking_client/internal/services/api_service"
 	"booking_client/internal/util"
 	"fmt"
@@ -140,7 +141,7 @@ func (h *ClientHandler) HandleBookAppointmentsMonthNavigation(ctx context.Contex
 }
 
 // showTimeSelection shows available time slots
-func (h *ClientHandler) showTimeSelection(ctx context.Context, chatID int64, availability *models.ProfessionalAvailabilityResponse) {
+func (h *ClientHandler) showTimeSelection(ctx context.Context, chatID int64, availability *schemas.ProfessionalAvailabilityResponse) {
 	text := fmt.Sprintf(handlersCommon.UIMsgSelectTime, availability.Date)
 	keyboard := h.createTimeKeyboard(availability)
 	_, err := h.sendMessageWithKeyboardAndID(chatID, text, keyboard)

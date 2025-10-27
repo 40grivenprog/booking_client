@@ -7,6 +7,7 @@ import (
 
 	"booking_client/internal/handlers/common"
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	apiService "booking_client/internal/services/api_service"
 	"booking_client/internal/util"
 )
@@ -64,7 +65,7 @@ func (h *ProfessionalHandler) HandleUnavailableDateSelection(ctx context.Context
 }
 
 // showUnavailableStartTimeSelection shows available time slots for start time
-func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, availability *models.ProfessionalAvailabilityResponse) {
+func (h *ProfessionalHandler) showUnavailableStartTimeSelection(chatID int64, availability *schemas.ProfessionalAvailabilityResponse) {
 	text := fmt.Sprintf(common.UIMsgSelectUnavailableStartTime, availability.Date)
 	keyboard := h.createUnavailableStartTimeKeyboard(availability)
 	h.sendMessageWithKeyboard(chatID, text, keyboard)
@@ -96,11 +97,11 @@ func (h *ProfessionalHandler) HandleUnavailableStartTimeSelection(ctx context.Co
 }
 
 // showUnavailableEndTimeSelection shows available time slots for end time
-func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, availability *models.ProfessionalAvailabilityResponse) {
+func (h *ProfessionalHandler) showUnavailableEndTimeSelection(chatID int64, startTime string, availability *schemas.ProfessionalAvailabilityResponse) {
 	text := fmt.Sprintf(common.UIMsgSelectUnavailableEndTime, startTime)
 
 	// Find the first unavailable slot after the selected start time to show warning
-	var firstUnavailableSlot *models.TimeSlot
+	var firstUnavailableSlot *schemas.TimeSlot
 
 	for _, slot := range availability.Slots {
 		slotStart, err := time.Parse(time.RFC3339, slot.StartTime)

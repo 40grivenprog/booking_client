@@ -3,6 +3,7 @@ package common
 import (
 	"booking_client/internal/models"
 	"booking_client/internal/repository"
+	"booking_client/internal/schemas"
 	"booking_client/pkg/telegram"
 
 	"github.com/rs/zerolog"
@@ -18,7 +19,7 @@ func FormatAppointmentTime(startTime, endTime string) (string, string, string) {
 
 // FormatAppointmentDetails formats appointment details for client display
 // Deprecated: Use NewClientAppointmentMessage(apt, index).ForClient() instead
-func FormatAppointmentDetails(apt *models.ClientAppointment, index int) string {
+func FormatAppointmentDetails(apt *schemas.ClientAppointment, index int) string {
 	return NewClientAppointmentMessage(apt, index).ForClient()
 }
 
@@ -37,6 +38,6 @@ func GetUserOrSendError(userRepo *repository.UserRepository, bot *telegram.Bot, 
 
 // FormatProfessionalAppointmentDetails formats appointment details for professional display
 // Deprecated: Use NewProfessionalAppointmentMessage(apt, index).ForProfessional() instead
-func FormatProfessionalAppointmentDetails(apt *models.ProfessionalAppointment, index int) string {
+func FormatProfessionalAppointmentDetails(apt *schemas.ProfessionalAppointment, index int) string {
 	return NewProfessionalAppointmentMessage(apt, index).ForProfessional()
 }

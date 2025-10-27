@@ -2,7 +2,7 @@ package keyboards
 
 import (
 	"booking_client/internal/handlers/common"
-	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	"booking_client/internal/util"
 	"fmt"
 	"time"
@@ -38,11 +38,14 @@ func (kb *ProfessionalKeyboards) CreateProfessionalDashboardKeyboard() tgbotapi.
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(common.BtnSetUnavailable, "set_unavailable"),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(common.BtnPreviousAppointments, "professional_previous_appointments"),
+		),
 	)
 }
 
 // CreateProfessionalAppointmentsKeyboard creates a keyboard for professional appointment management
-func (kb *ProfessionalKeyboards) CreateProfessionalAppointmentsKeyboard(appointments []models.ProfessionalAppointment, showConfirm bool) tgbotapi.InlineKeyboardMarkup {
+func (kb *ProfessionalKeyboards) CreateProfessionalAppointmentsKeyboard(appointments []schemas.ProfessionalAppointment, showConfirm bool) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for index, apt := range appointments {
@@ -133,7 +136,7 @@ func (kb *ProfessionalKeyboards) CreateUnavailableDateKeyboard(currentDate time.
 }
 
 // CreateUnavailableStartTimeKeyboard creates a keyboard for unavailable start time selection
-func (kb *ProfessionalKeyboards) CreateUnavailableStartTimeKeyboard(availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (kb *ProfessionalKeyboards) CreateUnavailableStartTimeKeyboard(availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	var currentRow []tgbotapi.InlineKeyboardButton
 
@@ -176,7 +179,7 @@ func (kb *ProfessionalKeyboards) CreateUnavailableStartTimeKeyboard(availability
 }
 
 // CreateUnavailableEndTimeKeyboard creates a keyboard for unavailable end time selection
-func (kb *ProfessionalKeyboards) CreateUnavailableEndTimeKeyboard(startTime string, availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (kb *ProfessionalKeyboards) CreateUnavailableEndTimeKeyboard(startTime string, availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	var currentRow []tgbotapi.InlineKeyboardButton
 
@@ -290,7 +293,7 @@ func (kb *ProfessionalKeyboards) CreateUpcomingAppointmentsDateKeyboard(dates []
 }
 
 // CreateTimetableKeyboard creates a keyboard for timetable with day navigation and appointment actions
-func (kb *ProfessionalKeyboards) CreateTimetableKeyboard(dateStr string, appointments []models.TimetableAppointment) tgbotapi.InlineKeyboardMarkup {
+func (kb *ProfessionalKeyboards) CreateTimetableKeyboard(dateStr string, appointments []schemas.TimetableAppointment) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	// Add day navigation buttons
@@ -320,6 +323,63 @@ func (kb *ProfessionalKeyboards) CreateTimetableKeyboard(dateStr string, appoint
 	}
 
 	// Add back to dashboard button
+	backButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnBackToDashboard, "back_to_dashboard")
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// CreateClientsKeyboard creates a keyboard for client selection
+func CreateClientsKeyboard(clients []schemas.ProfessionalClient) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	// Add client buttons
+	for _, client := range clients {
+		btn := tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf("%s %s", client.FirstName, client.LastName),
+			fmt.Sprintf("select_client_%s", client.ID),
+		)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+	}
+
+	// Add back to dashboard button
+	backButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnBackToDashboard, "back_to_dashboard")
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// CreatePreviousAppointmentsNavigationKeyboard creates navigation keyboard for previous appointments
+func CreatePreviousAppointmentsNavigationKeyboard(currentMonth time.Time, hasAppointments bool) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	// Navigation buttons
+	var navButtons []tgbotapi.InlineKeyboardButton
+
+	// Previous month button (always available)
+	prevMonthStr := currentMonth.AddDate(0, -1, 0).Format("2006-01")
+	prevButton := tgbotapi.NewInlineKeyboardButtonData(
+		common.BtnPreviousMonth,
+		fmt.Sprintf("prev_previous_month_%s", prevMonthStr),
+	)
+	navButtons = append(navButtons, prevButton)
+
+	// Next month button (only if not in future)
+	nextMonth := currentMonth.AddDate(0, 1, 0)
+	if nextMonth.Before(time.Now()) || nextMonth.Format("2006-01") == time.Now().Format("2006-01") {
+		nextMonthStr := nextMonth.Format("2006-01")
+		nextButton := tgbotapi.NewInlineKeyboardButtonData(
+			common.BtnNextMonth,
+			fmt.Sprintf("next_previous_month_%s", nextMonthStr),
+		)
+		navButtons = append(navButtons, nextButton)
+	}
+
+	if len(navButtons) > 0 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(navButtons...))
+	}
+
+	// Back to dashboard button
 	backButton := tgbotapi.NewInlineKeyboardButtonData(common.BtnBackToDashboard, "back_to_dashboard")
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(backButton))
 
