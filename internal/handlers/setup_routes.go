@@ -43,6 +43,9 @@ func (h *Handler) setupRoutes() {
 	h.callbackRouter.RegisterExact(handlersCommon.CallbackSetUnavailable, func(ctx context.Context, chatID int64, _ string, messageID int) {
 		h.professionalHandler.HandleSetUnavailable(ctx, chatID, messageID)
 	})
+	h.callbackRouter.RegisterExact(handlersCommon.CallbackProfessionalPreviousAppointments, func(ctx context.Context, chatID int64, _ string, messageID int) {
+		h.professionalHandler.HandlePreviousAppointments(ctx, chatID, messageID)
+	})
 
 	// Unavailable navigation
 	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixPrevUnavailableMonth, func(ctx context.Context, chatID int64, month string, messageID int) {
@@ -113,6 +116,17 @@ func (h *Handler) setupRoutes() {
 	})
 	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixSelectUnavailableEnd, func(ctx context.Context, chatID int64, endTime string, messageID int) {
 		h.professionalHandler.HandleUnavailableEndTimeSelection(ctx, chatID, endTime, messageID)
+	})
+
+	// Previous appointments flow
+	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixSelectClient, func(ctx context.Context, chatID int64, clientID string, messageID int) {
+		h.professionalHandler.HandleClientSelection(ctx, chatID, clientID, messageID)
+	})
+	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixPrevPreviousMonth, func(ctx context.Context, chatID int64, month string, messageID int) {
+		h.professionalHandler.HandlePreviousAppointmentsMonthNavigation(ctx, chatID, month, handlersCommon.DirectionPrev, messageID)
+	})
+	h.callbackRouter.RegisterPrefix(handlersCommon.CallbackPrefixNextPreviousMonth, func(ctx context.Context, chatID int64, month string, messageID int) {
+		h.professionalHandler.HandlePreviousAppointmentsMonthNavigation(ctx, chatID, month, handlersCommon.DirectionNext, messageID)
 	})
 
 	// Back to dashboard (special case - needs user lookup)

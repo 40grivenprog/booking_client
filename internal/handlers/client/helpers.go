@@ -3,6 +3,7 @@ package client
 import (
 	"booking_client/internal/common"
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	"context"
 	"fmt"
 	"time"
@@ -90,7 +91,7 @@ func (h *ClientHandler) createDateKeyboard(currentDate time.Time) tgbotapi.Inlin
 	return h.keyboards.CreateDateKeyboard(currentDate)
 }
 
-func (h *ClientHandler) createTimeKeyboard(availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (h *ClientHandler) createTimeKeyboard(availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateTimeKeyboard(availability)
 }
 
@@ -98,7 +99,7 @@ func (h *ClientHandler) createProfessionalsKeyboard(professionals []models.User)
 	return h.keyboards.CreateProfessionalsKeyboard(professionals)
 }
 
-func (h *ClientHandler) createAppointmentsKeyboard(appointments []models.ClientAppointment, buttonPrefix string) tgbotapi.InlineKeyboardMarkup {
+func (h *ClientHandler) createAppointmentsKeyboard(appointments []schemas.ClientAppointment, buttonPrefix string) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateAppointmentsKeyboard(appointments, buttonPrefix)
 }
 

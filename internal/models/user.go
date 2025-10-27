@@ -17,6 +17,7 @@ type User struct {
 	SelectedUnavailableEndTime     string  `json:"selected_unavailable_end_time,omitempty"`    // Temporary storage for selected unavailable end time
 	SelectedUnavailableDescription string  `json:"selected_unavailable_description,omitempty"` // Temporary storage for selected unavailable description
 	SelectedAppointmentID          string  `json:"selected_appointment_id,omitempty"`          // Temporary storage for appointment cancellation
+	SelectedClientID               *string `json:"selected_client_id,omitempty"`               // Temporary storage for selected client
 	LastMessageID                  *int    `json:"last_message_id,omitempty"`                  // ID of the last message sent to user
 	MessagesToDelete               []*int  `json:"messages_to_delete,omitempty"`               // IDs of messages to delete
 	CreatedAt                      string  `json:"created_at"`

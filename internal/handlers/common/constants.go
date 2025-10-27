@@ -100,6 +100,7 @@ const (
 	BtnPendingAppointments      = "⏳ Pending Appointments"
 	BtnUpcomingAppointments     = "📋 Upcoming Appointments"
 	BtnSetUnavailable           = "🚫 Set Unavailable"
+	BtnPreviousAppointments     = "📜 Previous Appointments"
 	BtnConfirmAppointmentProf   = "✅ Confirm Appointment #%d"
 	BtnCancelAppointmentProf    = "❌ Cancel Appointment #%d"
 	BtnCancelAppointmentProfAlt = "❌ Cancel Appintment %d"
@@ -121,4 +122,10 @@ const (
 const (
 	DaysPerRow      = 7
 	TimeSlotsPerRow = 3
+)
+
+// Additional error messages
+const (
+	ErrorMsgFailedToRetrieveClients      = "❌ Failed to retrieve clients: %s"
+	ErrorMsgFailedToRetrieveAppointments = "❌ Failed to retrieve appointments: %s"
 )

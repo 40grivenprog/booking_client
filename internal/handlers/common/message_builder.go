@@ -2,6 +2,7 @@ package common
 
 import (
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	"fmt"
 	"time"
 )
@@ -13,7 +14,7 @@ type AppointmentMessage struct {
 }
 
 // NewClientAppointmentMessage creates a message builder for client appointments
-func NewClientAppointmentMessage(apt *models.ClientAppointment, index int) *AppointmentMessage {
+func NewClientAppointmentMessage(apt *schemas.ClientAppointment, index int) *AppointmentMessage {
 	return &AppointmentMessage{
 		appointment: apt,
 		index:       index,
@@ -21,7 +22,7 @@ func NewClientAppointmentMessage(apt *models.ClientAppointment, index int) *Appo
 }
 
 // NewProfessionalAppointmentMessage creates a message builder for professional appointments
-func NewProfessionalAppointmentMessage(apt *models.ProfessionalAppointment, index int) *AppointmentMessage {
+func NewProfessionalAppointmentMessage(apt *schemas.ProfessionalAppointment, index int) *AppointmentMessage {
 	return &AppointmentMessage{
 		appointment: apt,
 		index:       index,
@@ -30,7 +31,7 @@ func NewProfessionalAppointmentMessage(apt *models.ProfessionalAppointment, inde
 
 // ForClient formats appointment for client view
 func (m *AppointmentMessage) ForClient() string {
-	apt, ok := m.appointment.(*models.ClientAppointment)
+	apt, ok := m.appointment.(*schemas.ClientAppointment)
 	if !ok {
 		return ""
 	}
@@ -44,7 +45,7 @@ func (m *AppointmentMessage) ForClient() string {
 
 // ForProfessional formats appointment for professional view
 func (m *AppointmentMessage) ForProfessional() string {
-	apt, ok := m.appointment.(*models.ProfessionalAppointment)
+	apt, ok := m.appointment.(*schemas.ProfessionalAppointment)
 	if !ok {
 		return ""
 	}
@@ -58,12 +59,12 @@ func (m *AppointmentMessage) ForProfessional() string {
 
 // TimetableSlotMessage builds formatted messages for timetable slots
 type TimetableSlotMessage struct {
-	slot  *models.TimetableAppointment
+	slot  *schemas.TimetableAppointment
 	index int
 }
 
 // NewTimetableSlotMessage creates a message builder for timetable slots
-func NewTimetableSlotMessage(slot *models.TimetableAppointment, index int) *TimetableSlotMessage {
+func NewTimetableSlotMessage(slot *schemas.TimetableAppointment, index int) *TimetableSlotMessage {
 	return &TimetableSlotMessage{
 		slot:  slot,
 		index: index,
@@ -186,11 +187,11 @@ func (m *WelcomeMessage) ForProfessional() string {
 // TimetableMessage builds timetable header messages
 type TimetableMessage struct {
 	date  string
-	slots []models.TimetableAppointment
+	slots []schemas.TimetableAppointment
 }
 
 // NewTimetableMessage creates a timetable message builder
-func NewTimetableMessage(date string, slots []models.TimetableAppointment) *TimetableMessage {
+func NewTimetableMessage(date string, slots []schemas.TimetableAppointment) *TimetableMessage {
 	return &TimetableMessage{
 		date:  date,
 		slots: slots,

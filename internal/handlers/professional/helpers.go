@@ -3,6 +3,7 @@ package professional
 import (
 	"booking_client/internal/common"
 	"booking_client/internal/models"
+	"booking_client/internal/schemas"
 	"context"
 	"fmt"
 	"time"
@@ -94,7 +95,7 @@ func (h *ProfessionalHandler) createProfessionalDashboardKeyboard() tgbotapi.Inl
 	return h.keyboards.CreateProfessionalDashboardKeyboard()
 }
 
-func (h *ProfessionalHandler) createProfessionalAppointmentsKeyboard(appointments []models.ProfessionalAppointment, showConfirm bool) tgbotapi.InlineKeyboardMarkup {
+func (h *ProfessionalHandler) createProfessionalAppointmentsKeyboard(appointments []schemas.ProfessionalAppointment, showConfirm bool) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateProfessionalAppointmentsKeyboard(appointments, showConfirm)
 }
 
@@ -102,11 +103,11 @@ func (h *ProfessionalHandler) createUnavailableDateKeyboard(currentDate time.Tim
 	return h.keyboards.CreateUnavailableDateKeyboard(currentDate)
 }
 
-func (h *ProfessionalHandler) createUnavailableStartTimeKeyboard(availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (h *ProfessionalHandler) createUnavailableStartTimeKeyboard(availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateUnavailableStartTimeKeyboard(availability)
 }
 
-func (h *ProfessionalHandler) createUnavailableEndTimeKeyboard(startTime string, availability *models.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
+func (h *ProfessionalHandler) createUnavailableEndTimeKeyboard(startTime string, availability *schemas.ProfessionalAvailabilityResponse) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateUnavailableEndTimeKeyboard(startTime, availability)
 }
 
@@ -114,6 +115,6 @@ func (h *ProfessionalHandler) createUpcomingAppointmentsDateKeyboard(dates []str
 	return h.keyboards.CreateUpcomingAppointmentsDateKeyboard(dates, currentMonth)
 }
 
-func (h *ProfessionalHandler) createTimetableKeyboard(dateStr string, appointments []models.TimetableAppointment) tgbotapi.InlineKeyboardMarkup {
+func (h *ProfessionalHandler) createTimetableKeyboard(dateStr string, appointments []schemas.TimetableAppointment) tgbotapi.InlineKeyboardMarkup {
 	return h.keyboards.CreateTimetableKeyboard(dateStr, appointments)
 }

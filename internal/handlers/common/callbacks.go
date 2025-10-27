@@ -23,11 +23,19 @@ const (
 	CallbackProfessionalUpcomingAppointments = "professional_upcoming_appointments"
 	CallbackProfessionalTimetable            = "professional_timetable"
 	CallbackSetUnavailable                   = "set_unavailable"
+	CallbackProfessionalPreviousAppointments = "professional_previous_appointments"
 
 	// Unavailable navigation
 	CallbackPrefixPrevUnavailableMonth = "prev_unavailable_month_"
 	CallbackPrefixNextUnavailableMonth = "next_unavailable_month_"
 	CallbackCancelUnavailable          = "cancel_unavailable"
+
+	// Client selection
+	CallbackPrefixSelectClient = "select_client_"
+
+	// Previous appointments navigation
+	CallbackPrefixPrevPreviousMonth = "prev_previous_month_"
+	CallbackPrefixNextPreviousMonth = "next_previous_month_"
 
 	// Common
 	CallbackBackToDashboard = "back_to_dashboard"
